@@ -388,10 +388,13 @@ const LIGHT = {
    STATIC CSS — injected once
    ============================================================ */
 const STATIC_CSS = `
+:root{ --dur-fast:150ms; --dur-base:250ms; --dur-slow:400ms; --ease:cubic-bezier(.22,1,.36,1); }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 body{font-family:'Inter',-apple-system,sans-serif;}
 button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;}
 input{font-family:inherit;}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;}}
 @keyframes fadeUp{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}
 @keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
 @keyframes pop{0%{transform:scale(.85);opacity:0;}60%{transform:scale(1.04);}100%{transform:scale(1);opacity:1;}}
@@ -421,6 +424,7 @@ function makeCSS(C, simplified) {
   const MONO = `'IBM Plex Mono',monospace`;
   return `
 .app-root{background:${C.bg};color:${C.textPrimary};font-size:${baseFont}px;line-height:1.55;min-height:100vh;font-family:${BODY};}
+.app-root :focus-visible{outline:2px solid ${C.orange};outline-offset:2px;border-radius:8px;}
 .shell{max-width:430px;margin:0 auto;min-height:100vh;background:${C.bg};position:relative;overflow-x:hidden;}
 .scroll{padding:0 20px 108px;}
 .mono{font-family:${MONO};}
@@ -581,8 +585,10 @@ function makeCSS(C, simplified) {
 .strip-seg{flex:1;height:6px;border-radius:4px;background:${C.border};overflow:hidden;}
 .strip-fill{height:100%;border-radius:4px;}
 .wk-ctrls{display:flex;gap:12px;padding:8px 22px calc(24px + env(safe-area-inset-bottom));}
-.ctrl-pause{flex:1;background:${C.card};border:1.5px solid ${C.border};color:${C.textPrimary};font-family:${HEAD};font-weight:700;font-size:15px;padding:16px;border-radius:14px;}
-.ctrl-finish{flex:1.6;background:${C.orange};color:#fff;font-family:${HEAD};font-weight:700;font-size:15px;padding:16px;border-radius:14px;box-shadow:0 6px 18px ${C.orangeGlow};}
+.ctrl-pause{flex:1;background:${C.card};border:1.5px solid ${C.border};color:${C.textPrimary};font-family:${HEAD};font-weight:700;font-size:17px;padding:21px 16px;border-radius:16px;min-height:64px;}
+.ctrl-finish{flex:1.6;background:${C.orange};color:#fff;font-family:${HEAD};font-weight:700;font-size:17px;padding:21px 16px;border-radius:16px;min-height:64px;box-shadow:0 6px 18px ${C.orangeGlow};}
+.slider-val-btn{background:none;border:none;width:100%;cursor:text;padding:0;}
+.tap-hint{color:${C.textMuted};opacity:.8;}
 
 .stretch-full{position:fixed;inset:0;background:${C.bg};z-index:60;display:flex;flex-direction:column;align-items:center;justify-content:center;max-width:430px;margin:0 auto;padding:30px;text-align:center;gap:8px;}
 .stretch-em{font-size:60px;}
@@ -625,7 +631,7 @@ function makeCSS(C, simplified) {
 .cal-day{flex-shrink:0;width:54px;background:${C.card};border:1.5px solid ${C.border};border-radius:14px;padding:11px 0;text-align:center;box-shadow:${cardShadow};}
 .cal-day.sel{border-color:${C.orange};background:${C.orange}12;}
 .cal-dow{font-size:10px;color:${C.textMuted};font-family:${MONO};text-transform:uppercase;letter-spacing:.06em;}
-.cal-typ{font-size:19px;margin-top:5px;}
+.cal-typ{margin-top:6px;display:flex;justify-content:center;}
 .cal-day.sel .cal-dow{color:${C.orange};}
 .iv-bar{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid ${C.borderSoft};}
 .iv-bar:last-child{border-bottom:none;}
@@ -1183,6 +1189,15 @@ function shieldEarned(checkins) {
   return (checkins || []).length >= 7;
 }
 
+/* light haptic on primary actions (no-op where unsupported) */
+function haptic(ms) {
+  try {
+    if (navigator.vibrate) navigator.vibrate(ms || 12);
+  } catch (e) {}
+}
+
+/* #39 — frozen 12-event core schema. Keep names stable so history stays comparable. */
+const EVENTS = ["step_completed", "onboarding_complete", "screen_view", "energy_set", "workout_start", "workout_resume", "workout_complete", "skip_used", "tip_shown", "day_tap", "export", "import"];
 /* #7 analytics event spine (local now; POST-ready later) */
 function track(event, props) {
   try {
@@ -1273,6 +1288,73 @@ const Icon = ({
   }, p[name]);
 };
 
+/* UI glyphs — replace decorative emoji (keep emoji only for feeling/mood input) */
+const Glyph = ({
+  name,
+  size = 20,
+  color = "currentColor"
+}) => {
+  const P = {
+    flame: /*#__PURE__*/React.createElement("path", {
+      d: "M12 2s5 4.4 5 8.8a5 5 0 01-10 0c0-1.5.6-2.7.6-2.7S8.2 9.6 9.2 11.4C9.6 8.8 12 7.2 12 7.2S10.6 4.8 12 2z",
+      fill: color
+    }),
+    shield: /*#__PURE__*/React.createElement("path", {
+      d: "M12 2.5l7.2 3v5.9c0 4.4-3 7.4-7.2 8.9-4.2-1.5-7.2-4.5-7.2-8.9V5.5L12 2.5z",
+      fill: "none",
+      stroke: color,
+      strokeWidth: "1.8",
+      strokeLinejoin: "round"
+    }),
+    rest: /*#__PURE__*/React.createElement("path", {
+      d: "M20 14.6A7.6 7.6 0 019.4 4.1a6.1 6.1 0 1010.6 10.5z",
+      fill: "none",
+      stroke: color,
+      strokeWidth: "1.8",
+      strokeLinejoin: "round"
+    }),
+    run: /*#__PURE__*/React.createElement("g", {
+      fill: "none",
+      stroke: color,
+      strokeWidth: "1.8",
+      strokeLinecap: "round",
+      strokeLinejoin: "round"
+    }, /*#__PURE__*/React.createElement("circle", {
+      cx: "15.5",
+      cy: "5",
+      r: "1.7",
+      fill: color,
+      stroke: "none"
+    }), /*#__PURE__*/React.createElement("path", {
+      d: "M8 11.5l3.3-1.3 2.2 2.3 2.7 1M13.5 12.5l-1 4.2 2.6 2.8M13 15l-2.6 1-1.4 3.5"
+    })),
+    walk: /*#__PURE__*/React.createElement("g", {
+      fill: "none",
+      stroke: color,
+      strokeWidth: "1.8",
+      strokeLinecap: "round",
+      strokeLinejoin: "round"
+    }, /*#__PURE__*/React.createElement("circle", {
+      cx: "13.5",
+      cy: "4.7",
+      r: "1.7",
+      fill: color,
+      stroke: "none"
+    }), /*#__PURE__*/React.createElement("path", {
+      d: "M11 9.5l2.6-.6 1.6 2.4 2.1.9M13.2 11.3l-.6 4.4 2.2 3.3M12.8 14l-2.4 1.2-1.2 4"
+    }))
+  };
+  return /*#__PURE__*/React.createElement("svg", {
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24",
+    "aria-hidden": "true",
+    style: {
+      display: "block"
+    }
+  }, P[name]);
+};
+
 /* ============================================================
    ONBOARDING
    ============================================================ */
@@ -1306,6 +1388,10 @@ function Onboarding({
   const [step, setStep] = useState(0);
   const [parq, setParq] = useState([null, null, null]);
   const [genStep, setGenStep] = useState(0);
+  const [typing, setTyping] = useState(false);
+  useEffect(() => {
+    setTyping(false);
+  }, [step]);
   const steps = useMemo(() => {
     const s = [{
       key: "name",
@@ -1492,6 +1578,11 @@ function Onboarding({
     });
   };
   const next = () => {
+    haptic();
+    track("step_completed", {
+      key: cur && cur.key,
+      step
+    });
     if (step < steps.length - 1) setStep(s => s + 1);else setPhase("parq");
   };
   const back = () => {
@@ -1646,17 +1737,47 @@ function Onboarding({
     style: {
       padding: "10px 0 4px"
     }
+  }, typing && !cur.fmt ? /*#__PURE__*/React.createElement("input", {
+    className: "ob-input",
+    autoFocus: true,
+    type: "number",
+    inputMode: "numeric",
+    min: cur.min,
+    max: cur.max,
+    defaultValue: answers[cur.key],
+    onBlur: e => {
+      const n = parseInt(e.target.value);
+      if (!isNaN(n)) onSlider(cur.key, Math.max(cur.min, Math.min(cur.max, n)));
+      setTyping(false);
+    },
+    onKeyDown: e => {
+      if (e.key === "Enter") {
+        const n = parseInt(e.target.value);
+        if (!isNaN(n)) onSlider(cur.key, Math.max(cur.min, Math.min(cur.max, n)));
+        setTyping(false);
+      }
+    }
+  }) : /*#__PURE__*/React.createElement("button", {
+    className: "slider-val-btn",
+    onClick: () => {
+      if (!cur.fmt) setTyping(true);
+    },
+    "aria-label": "Value " + (cur.fmt ? cur.fmt(answers[cur.key]) : answers[cur.key]) + (cur.fmt ? "" : ", tap to type")
   }, /*#__PURE__*/React.createElement("div", {
     className: "ob-slider-val"
-  }, cur.fmt ? cur.fmt(answers[cur.key]) : answers[cur.key]), /*#__PURE__*/React.createElement("div", {
+  }, cur.fmt ? cur.fmt(answers[cur.key]) : answers[cur.key])), /*#__PURE__*/React.createElement("div", {
     className: "ob-slider-unit"
-  }, cur.unit), /*#__PURE__*/React.createElement("input", {
+  }, cur.unit, !cur.fmt && !typing && /*#__PURE__*/React.createElement("span", {
+    className: "tap-hint"
+  }, " · tap to type")), /*#__PURE__*/React.createElement("input", {
     type: "range",
     className: "range",
     min: cur.min,
     max: cur.max,
     step: cur.step || 1,
     value: answers[cur.key],
+    "aria-label": cur.q,
+    "aria-valuetext": (cur.fmt ? cur.fmt(answers[cur.key]) : answers[cur.key]) + " " + cur.unit,
     onChange: e => onSlider(cur.key, parseInt(e.target.value))
   })), /*#__PURE__*/React.createElement("div", {
     className: "ob-foot"
@@ -1703,7 +1824,10 @@ function Nav({
     className: "nav-item " + (screen === k ? "active" : ""),
     "aria-current": screen === k ? "page" : undefined,
     "aria-label": l,
-    onClick: () => setScreen(k)
+    onClick: () => {
+      haptic();
+      setScreen(k);
+    }
   }, /*#__PURE__*/React.createElement(Icon, {
     name: k
   }), /*#__PURE__*/React.createElement("span", {
@@ -1821,7 +1945,13 @@ function TodayScreen({
     className: "energy-btn " + (energy === v ? "sel" : ""),
     "aria-label": "Energy: " + v,
     "aria-pressed": energy === v,
-    onClick: () => setEnergy(v)
+    onClick: () => {
+      haptic();
+      track("energy_set", {
+        v
+      });
+      setEnergy(v);
+    }
   }, /*#__PURE__*/React.createElement("span", {
     className: "em"
   }, em), /*#__PURE__*/React.createElement("span", {
@@ -1833,8 +1963,10 @@ function TodayScreen({
   }, "🎯"), /*#__PURE__*/React.createElement("div", {
     className: "coach-txt",
     key: energy,
+    role: "status",
+    "aria-live": "polite",
     style: {
-      animation: "fadeIn .4s ease"
+      animation: "fadeIn var(--dur-slow) var(--ease)"
     }
   }, msg))), cyclePhase && /*#__PURE__*/React.createElement("div", {
     className: "cycle-banner fu2 section-gap-sm",
@@ -1857,7 +1989,11 @@ function TodayScreen({
     className: "streak-pill"
   }, /*#__PURE__*/React.createElement("span", {
     className: "streak-ico"
-  }, "🔥"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(Glyph, {
+    name: "flame",
+    size: 22,
+    color: C.orange
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     className: "streak-n"
   }, streak), /*#__PURE__*/React.createElement("div", {
     className: "streak-lb"
@@ -1865,7 +2001,11 @@ function TodayScreen({
     className: "streak-pill shield-pill"
   }, /*#__PURE__*/React.createElement("span", {
     className: "streak-ico"
-  }, "🛡️"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(Glyph, {
+    name: "shield",
+    size: 21,
+    color: C.yellow
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     className: "streak-n",
     style: {
       color: C.yellow
@@ -1928,10 +2068,17 @@ function TodayScreen({
     }
   }, day.focus, " A short walk is welcome, but today rest is the work.") : /*#__PURE__*/React.createElement("button", {
     className: "btn-primary",
-    onClick: () => setReadyOpen(true)
+    onClick: () => {
+      haptic();
+      setReadyOpen(true);
+    }
   }, day.type === "walk" ? "START WALK" : "START WORKOUT"), day.type === "run" && /*#__PURE__*/React.createElement("button", {
     className: "btn-soft",
-    onClick: () => setSkipOpen(true)
+    onClick: () => {
+      haptic();
+      track("skip_used");
+      setSkipOpen(true);
+    }
   }, "Not feeling it today? That's okay →")), /*#__PURE__*/React.createElement("div", {
     className: "card fu5 section-gap"
   }, /*#__PURE__*/React.createElement("div", {
@@ -2007,6 +2154,7 @@ function TodayScreen({
   }, /*#__PURE__*/React.createElement("span", null, "🔒"), /*#__PURE__*/React.createElement("span", null, "Clip the treadmill safety key to your waistband before you start.")), /*#__PURE__*/React.createElement("button", {
     className: "btn-primary",
     onClick: () => {
+      haptic(20);
       setReadyOpen(false);
       onStart(day);
     }
@@ -2675,10 +2823,15 @@ function TrainScreen({
   profile
 }) {
   const [sel, setSel] = useState(0);
-  const typeEmoji = {
-    run: "🏃",
-    walk: "🚶",
-    rest: "😴"
+  const typeGlyph = {
+    run: "run",
+    walk: "walk",
+    rest: "rest"
+  };
+  const typeLabel = {
+    run: "Run",
+    walk: "Walk",
+    rest: "Rest"
   };
   const day = plan[sel];
   const goals = Array.isArray(profile.mainGoal) ? profile.mainGoal : [];
@@ -2699,12 +2852,25 @@ function TrainScreen({
   }, plan.map((d, i) => /*#__PURE__*/React.createElement("button", {
     key: i,
     className: "cal-day " + (sel === i ? "sel" : ""),
-    onClick: () => setSel(i)
+    "aria-label": d.day + " — " + typeLabel[d.type],
+    "aria-pressed": sel === i,
+    onClick: () => {
+      haptic();
+      track("day_tap", {
+        day: d.day,
+        type: d.type
+      });
+      setSel(i);
+    }
   }, /*#__PURE__*/React.createElement("div", {
     className: "cal-dow"
   }, d.day), /*#__PURE__*/React.createElement("div", {
     className: "cal-typ"
-  }, typeEmoji[d.type]))))), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(Glyph, {
+    name: typeGlyph[d.type],
+    size: 19,
+    color: sel === i ? C.orange : C.textSecondary
+  })))))), /*#__PURE__*/React.createElement("div", {
     className: "card fu2 section-gap-sm"
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -2771,9 +2937,16 @@ function TrainScreen({
     className: "h-sec",
     style: {
       fontSize: 16,
-      marginBottom: 4
+      marginBottom: 4,
+      display: "flex",
+      alignItems: "center",
+      gap: 8
     }
-  }, "🚶 Why the walk days matter"), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(Glyph, {
+    name: "walk",
+    size: 18,
+    color: C.orange
+  }), " Why the walk days matter"), /*#__PURE__*/React.createElement("div", {
     className: "muted",
     style: {
       fontSize: 13,
@@ -2847,6 +3020,9 @@ function FoodScreen({
     ...c,
     [k]: !c[k]
   }));
+  useEffect(() => {
+    track("tip_shown");
+  }, []);
   return /*#__PURE__*/React.createElement("div", {
     className: "scroll"
   }, /*#__PURE__*/React.createElement("div", {
@@ -3031,10 +3207,13 @@ function ProgressScreen({
       color: C.textMuted
     }
   }, wl.length, " entries")), /*#__PURE__*/React.createElement("div", {
-    className: "chart"
+    className: "chart",
+    role: "img",
+    "aria-label": "Weight log, last " + Math.min(8, wl.length) + " entries: " + wl.slice(-8).join(", ") + " pounds"
   }, wl.slice(-8).map((w, i) => /*#__PURE__*/React.createElement("div", {
     className: "chart-col",
-    key: i
+    key: i,
+    "aria-hidden": "true"
   }, /*#__PURE__*/React.createElement("div", {
     className: "chart-bar",
     style: {
@@ -3044,7 +3223,11 @@ function ProgressScreen({
     }
   }), /*#__PURE__*/React.createElement("div", {
     className: "chart-x"
-  }, w)))), /*#__PURE__*/React.createElement("div", {
+  }, w)))), /*#__PURE__*/React.createElement("table", {
+    className: "sr-only"
+  }, /*#__PURE__*/React.createElement("caption", null, "Weight log entries"), /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Entry"), /*#__PURE__*/React.createElement("th", null, "Weight (lbs)"))), /*#__PURE__*/React.createElement("tbody", null, wl.slice(-8).map((w, i) => /*#__PURE__*/React.createElement("tr", {
+    key: i
+  }, /*#__PURE__*/React.createElement("td", null, i + 1), /*#__PURE__*/React.createElement("td", null, w))))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 9,
@@ -3149,11 +3332,14 @@ function ProgressScreen({
     style: {
       fontSize: 13
     }
-  }, "Your mood after workouts will chart here once you've logged a few.") : /*#__PURE__*/React.createElement("div", {
-    className: "mood-chart"
+  }, "Your mood after workouts will chart here once you've logged a few.") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "mood-chart",
+    role: "img",
+    "aria-label": "Mood after your last " + moodData.length + " workouts, scale 1 to 5: " + moodData.map(m => m.v).join(", ")
   }, moodData.map((m, i) => /*#__PURE__*/React.createElement("div", {
     className: "mood-col",
-    key: i
+    key: i,
+    "aria-hidden": "true"
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 18
@@ -3167,7 +3353,11 @@ function ProgressScreen({
       borderRadius: 5,
       animationDelay: i * 0.05 + "s"
     }
-  }))))), /*#__PURE__*/React.createElement("div", {
+  })))), /*#__PURE__*/React.createElement("table", {
+    className: "sr-only"
+  }, /*#__PURE__*/React.createElement("caption", null, "Mood after recent workouts"), /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Session"), /*#__PURE__*/React.createElement("th", null, "Mood (1–5)"))), /*#__PURE__*/React.createElement("tbody", null, moodData.map((m, i) => /*#__PURE__*/React.createElement("tr", {
+    key: i
+  }, /*#__PURE__*/React.createElement("td", null, i + 1), /*#__PURE__*/React.createElement("td", null, m.v))))))), /*#__PURE__*/React.createElement("div", {
     className: "section-gap-sm fu5"
   }, /*#__PURE__*/React.createElement("div", {
     className: "eyebrow",
@@ -3399,21 +3589,33 @@ function ProfileScreen({
   }, "Settings"), /*#__PURE__*/React.createElement("div", {
     className: "prof-row"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "prof-lab"
-  }, "Theme"), /*#__PURE__*/React.createElement("button", {
+    className: "prof-lab",
+    id: "lbl-theme"
+  }, "Light theme"), /*#__PURE__*/React.createElement("button", {
     className: "toggle " + (theme === "light" ? "on" : ""),
-    "aria-label": "Toggle light mode",
-    onClick: () => setTheme(theme === "dark" ? "light" : "dark")
+    role: "switch",
+    "aria-checked": theme === "light",
+    "aria-labelledby": "lbl-theme",
+    onClick: () => {
+      haptic();
+      setTheme(theme === "dark" ? "light" : "dark");
+    }
   }, /*#__PURE__*/React.createElement("div", {
     className: "toggle-knob"
   }))), /*#__PURE__*/React.createElement("div", {
     className: "prof-row"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "prof-lab"
+    className: "prof-lab",
+    id: "lbl-text"
   }, "Larger text"), /*#__PURE__*/React.createElement("button", {
     className: "toggle " + (simplified ? "on" : ""),
-    "aria-label": "Toggle larger text",
-    onClick: () => setSimplified(!simplified)
+    role: "switch",
+    "aria-checked": simplified,
+    "aria-labelledby": "lbl-text",
+    onClick: () => {
+      haptic();
+      setSimplified(!simplified);
+    }
   }, /*#__PURE__*/React.createElement("div", {
     className: "toggle-knob"
   }))), /*#__PURE__*/React.createElement("div", {
@@ -3634,6 +3836,25 @@ function App() {
   const themeCss = useMemo(() => makeCSS(C, simplified), [theme, simplified]);
   const todayIdx = (new Date().getDay() + 6) % 7; // Mon=0 … Sun=6
 
+  // #36 inject styles into <head> once, not on every React render
+  useEffect(() => {
+    let s = document.getElementById('cm-static');
+    if (!s) {
+      s = document.createElement('style');
+      s.id = 'cm-static';
+      s.textContent = STATIC_CSS;
+      document.head.appendChild(s);
+    }
+  }, []);
+  useEffect(() => {
+    let s = document.getElementById('cm-theme');
+    if (!s) {
+      s = document.createElement('style');
+      s.id = 'cm-theme';
+      document.head.appendChild(s);
+    }
+    s.textContent = themeCss;
+  }, [themeCss]);
   useEffect(() => {
     LS.set(K.theme, theme);
     const mt = document.querySelector('meta[name=theme-color]');
@@ -3665,6 +3886,10 @@ function App() {
     if (typeof navigator !== "undefined" && 'serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {
       navigator.serviceWorker.register('./sw.js').catch(() => {});
     }
+    // #40 durability: ask the browser to keep our storage (protects localStorage from iOS eviction)
+    try {
+      if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
+    } catch (e) {}
   }, []);
   useEffect(() => {
     if (appPhase === "app") track("screen_view", {
@@ -3859,15 +4084,7 @@ function App() {
   })();
   return /*#__PURE__*/React.createElement("div", {
     className: "app-root"
-  }, /*#__PURE__*/React.createElement("style", {
-    dangerouslySetInnerHTML: {
-      __html: STATIC_CSS
-    }
-  }), /*#__PURE__*/React.createElement("style", {
-    dangerouslySetInnerHTML: {
-      __html: themeCss
-    }
-  }), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("div", {
     className: "shell"
   }, appPhase === "onboarding" && /*#__PURE__*/React.createElement(Onboarding, {
     C: C,
