@@ -453,6 +453,29 @@ function makeCSS(C, simplified) {
 .btn-primary:active{transform:scale(.975);}
 .btn-ghost{width:100%;background:transparent;color:${C.textMuted};font-size:13px;padding:12px;border-radius:12px;margin-top:8px;font-family:${MONO};letter-spacing:.03em;border:1px solid ${C.border};}
 .btn-ghost:active{background:${C.cardAlt};}
+.btn-soft{width:100%;background:${C.orange}10;color:${C.textPrimary};font-size:13.5px;font-weight:500;font-family:${BODY};padding:13px;border-radius:13px;margin-top:8px;border:1px solid ${C.orange}2E;transition:all .15s;}
+.btn-soft:active{background:${C.orange}1F;}
+
+/* goal-progress ribbon */
+.goal-ribbon{background:${C.card};border:1px solid ${C.border};border-radius:14px;padding:13px 15px;box-shadow:${cardShadow};}
+.goal-ribbon-top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:9px;}
+.goal-ribbon-wk{font-family:${HEAD};font-weight:700;font-size:14px;color:${C.textPrimary};}
+.goal-ribbon-next{font-size:11.5px;color:${C.textSecondary};text-align:right;}
+.goal-ribbon-track{height:5px;border-radius:3px;background:${C.border};overflow:hidden;}
+.goal-ribbon-fill{height:100%;background:${C.orange};border-radius:3px;}
+
+/* combined check-in band */
+.checkin-band{background:${C.card};border:1px solid ${C.border};border-radius:18px;padding:16px;box-shadow:${cardShadow};}
+.coach-inline{display:flex;gap:11px;align-items:flex-start;margin-top:14px;padding-top:14px;border-top:1px solid ${C.borderSoft};}
+
+/* mission additions */
+.mission-reassure{font-size:12.5px;color:${C.textSecondary};margin:-2px 0 12px;line-height:1.45;}
+.iv-legend{display:flex;gap:15px;flex-wrap:wrap;margin:0 0 16px;}
+.iv-legend .lg{display:flex;align-items:center;gap:6px;font-size:11px;color:${C.textSecondary};}
+.iv-legend .sw{width:13px;height:6px;border-radius:3px;display:inline-block;}
+
+/* friendlier empty week */
+.empty-week{background:${C.card};border:1px dashed ${C.border};border-radius:14px;padding:18px 16px;text-align:center;font-size:13px;color:${C.textSecondary};line-height:1.5;box-shadow:${cardShadow};}
 
 .streak-row{display:flex;gap:10px;}
 .streak-pill{flex:1;background:${C.card};border:1px solid ${C.border};border-radius:14px;padding:13px 14px;display:flex;align-items:center;gap:10px;box-shadow:${cardShadow};}
@@ -846,7 +869,14 @@ function buildRunDay(variant, goals, timeTarget, runDuration) {
   const tpl = applyGoals(base, goals);
   const cycleLen = tpl.cycle.reduce((s, x) => s + x.duration, 0);
   const fixed = tpl.warmup.duration + tpl.cool.duration + (tpl.stress ? 2 : 0);
-  const workMin = Math.max(cycleLen, (timeTarget || 30) - fixed);
+  // #3 early-week duration ceiling so beginners aren't handed a 45-min day
+  const durCap = {
+    A: 30,
+    B: 35,
+    C: 60
+  }[variant] || 45;
+  const effTime = Math.min(timeTarget || 30, durCap);
+  const workMin = Math.max(cycleLen, effTime - fixed);
   const nCycles = Math.max(1, Math.round(workMin / cycleLen));
   const ivs = [{
     ...tpl.warmup
@@ -1584,11 +1614,14 @@ function coachMessage(profile, energy, cyclePhase, recoveryNote) {
   if (cyclePhase === "Ovulatory") return `You're near peak energy, ${name}. Great day to push your run blocks a little.`;
   if (cyclePhase === "Follicular") return `Energy's building this phase, ${name}. Let's ride it and add a touch of intensity.`;
   if (cyclePhase === "Menstrual") return `Be gentle with yourself today, ${name}. Movement helps, but easy is enough.`;
-  if (energy === "Low") return `Low tank today? That's fine. Showing up for a short session still counts — we'll keep it light.`;
-  if (energy === "High" && goals.includes("Build endurance")) return `You're charged up, ${name}. Perfect day to hold those longer run blocks we built for your endurance goal.`;
-  if (energy === "High") return `You're charged up, ${name}. Let's make today's run one you'll be proud of.`;
-  if (goals.includes("Reduce stress")) return `Today's session leans calm and steady, ${name} — moving to clear your head, not to chase a number.`;
-  return `Good to see you, ${name}. Today's a chance to stack one more honest session. Let's roll.`;
+  const why = goals.includes("Lose weight") ? "every honest session moves you toward your goal weight" : goals.includes("Build endurance") ? "today adds another brick to your endurance" : goals.includes("Reduce stress") ? "this is your time to move and clear your head" : "today's another chance to stack one honest session";
+  if (energy === "Low") return `Low tank today, ${name}? That's fine — even a short, easy session keeps your streak and your momentum alive.`;
+  if (energy === "High") return `You're charged up, ${name} — and ${why}. Let's make it count.`;
+  return `Good to see you, ${name}. Remember, ${why}. Let's roll.`;
+}
+const IV_LEGEND = [["walk", "Walk"], ["run", "Run"], ["cool", "Cool-down"]];
+function nextMilestone(planKey) {
+  return planKey === "A" ? "Jog 60 seconds without stopping" : planKey === "B" ? "Run 5 minutes continuously" : "Run a continuous 5K";
 }
 function TodayScreen({
   C,
@@ -1604,6 +1637,7 @@ function TodayScreen({
   weekStats
 }) {
   const [skipOpen, setSkipOpen] = useState(false);
+  const [readyOpen, setReadyOpen] = useState(false);
   const day = plan[0];
   const cyclePhase = profile.cyclePhase && profile.cyclePhase !== "Not sure" ? profile.cyclePhase : null;
   const msg = coachMessage(profile, energy, cyclePhase, day.recoveryNote);
@@ -1615,13 +1649,33 @@ function TodayScreen({
     Luteal: C.purple
   };
   const goals = Array.isArray(profile.mainGoal) ? profile.mainGoal : [];
+  const first = isRun ? day.intervals[0] : null;
+  const injury = profile.injuryPain && profile.injuryPain !== "None" ? profile.injuryPain : null;
+  const week = 3,
+    totalWeeks = 12; // demo — progression engine is future work
+  const usedTypes = isRun ? IV_LEGEND.filter(([t]) => day.intervals.some(iv => iv.type === t || t === "walk" && iv.type === "warmup")) : [];
   return /*#__PURE__*/React.createElement("div", {
     className: "scroll"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "fu1",
+    className: "goal-ribbon fu1",
     style: {
       marginTop: 4
     }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "goal-ribbon-top"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "goal-ribbon-wk"
+  }, "Week ", week, " of ", totalWeeks), /*#__PURE__*/React.createElement("div", {
+    className: "goal-ribbon-next"
+  }, "Next: ", nextMilestone(day.planKey))), /*#__PURE__*/React.createElement("div", {
+    className: "goal-ribbon-track"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "goal-ribbon-fill",
+    style: {
+      width: week / totalWeeks * 100 + "%"
+    }
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "checkin-band fu2 section-gap-sm"
   }, /*#__PURE__*/React.createElement("div", {
     className: "eyebrow",
     style: {
@@ -1639,13 +1693,17 @@ function TodayScreen({
     className: "em"
   }, em), /*#__PURE__*/React.createElement("span", {
     className: "lb"
-  }, v))))), /*#__PURE__*/React.createElement("div", {
-    className: "coach fu2 section-gap-sm"
+  }, v)))), /*#__PURE__*/React.createElement("div", {
+    className: "coach-inline"
   }, /*#__PURE__*/React.createElement("div", {
     className: "coach-av"
   }, "🎯"), /*#__PURE__*/React.createElement("div", {
-    className: "coach-txt"
-  }, msg)), cyclePhase && /*#__PURE__*/React.createElement("div", {
+    className: "coach-txt",
+    key: energy,
+    style: {
+      animation: "fadeIn .4s ease"
+    }
+  }, msg))), cyclePhase && /*#__PURE__*/React.createElement("div", {
     className: "cycle-banner fu2 section-gap-sm",
     style: {
       background: cycleColors[cyclePhase] + "14",
@@ -1687,9 +1745,11 @@ function TodayScreen({
     className: "plan-badge"
   }, "◆ Plan ", day.planKey, " · ", PLAN_VARIANTS[day.planKey].name), /*#__PURE__*/React.createElement("div", {
     className: "mission-title"
-  }, day.title), /*#__PURE__*/React.createElement("div", {
+  }, day.title), isRun && /*#__PURE__*/React.createElement("div", {
+    className: "mission-reassure"
+  }, "We'll guide every interval — just follow the cues."), /*#__PURE__*/React.createElement("div", {
     className: "mission-meta"
-  }, /*#__PURE__*/React.createElement("span", null, "⏱ ", /*#__PURE__*/React.createElement("b", null, day.totalMin, " min")), isRun && /*#__PURE__*/React.createElement("span", null, "◷ ", /*#__PURE__*/React.createElement("b", null, day.intervals.length), " intervals")), isRun && goals.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("span", null, "⏱ ", /*#__PURE__*/React.createElement("b", null, day.totalMin, " min")), isRun && /*#__PURE__*/React.createElement("span", null, "◷ ", /*#__PURE__*/React.createElement("b", null, "guided"), " walk/run"), first && /*#__PURE__*/React.createElement("span", null, "▶ start at ", /*#__PURE__*/React.createElement("b", null, (first.speed || 0).toFixed(1), " mph"), " · ", (first.incline || 0).toFixed(1), "%")), isRun && goals.length > 0 && /*#__PURE__*/React.createElement("div", {
     className: "goal-chips",
     style: {
       marginTop: 0,
@@ -1698,7 +1758,7 @@ function TodayScreen({
   }, goals.map(g => /*#__PURE__*/React.createElement("span", {
     className: "goal-chip",
     key: g
-  }, g))), isRun && /*#__PURE__*/React.createElement("div", {
+  }, g))), isRun && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "interval-preview",
     "aria-hidden": "true"
   }, day.intervals.map((iv, i) => /*#__PURE__*/React.createElement("div", {
@@ -1708,7 +1768,17 @@ function TodayScreen({
       flex: iv.duration,
       background: ivColor(C, iv.type)
     }
-  }))), day.recoveryNote && /*#__PURE__*/React.createElement("div", {
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "iv-legend"
+  }, usedTypes.map(([t, lab]) => /*#__PURE__*/React.createElement("span", {
+    className: "lg",
+    key: t
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "sw",
+    style: {
+      background: ivColor(C, t)
+    }
+  }), lab)))), day.recoveryNote && /*#__PURE__*/React.createElement("div", {
     className: "cycle-banner",
     style: {
       background: C.yellow + "12",
@@ -1725,11 +1795,11 @@ function TodayScreen({
     }
   }, day.focus, " A short walk is welcome, but today rest is the work.") : /*#__PURE__*/React.createElement("button", {
     className: "btn-primary",
-    onClick: () => onStart(day)
+    onClick: () => setReadyOpen(true)
   }, day.type === "walk" ? "START WALK" : "START WORKOUT"), day.type === "run" && /*#__PURE__*/React.createElement("button", {
-    className: "btn-ghost",
+    className: "btn-soft",
     onClick: () => setSkipOpen(true)
-  }, "Not feeling it today?")), /*#__PURE__*/React.createElement("div", {
+  }, "Not feeling it today? That's okay →")), /*#__PURE__*/React.createElement("div", {
     className: "card fu5 section-gap"
   }, /*#__PURE__*/React.createElement("div", {
     className: "h-sec",
@@ -1757,7 +1827,7 @@ function TodayScreen({
     style: {
       marginBottom: 10
     }
-  }, "This week"), /*#__PURE__*/React.createElement("div", {
+  }, "This week"), weekStats.total > 0 ? /*#__PURE__*/React.createElement("div", {
     className: "wk-grid"
   }, /*#__PURE__*/React.createElement("div", {
     className: "wk-cell"
@@ -1777,7 +1847,42 @@ function TodayScreen({
     className: "wk-num"
   }, weekStats.cals), /*#__PURE__*/React.createElement("div", {
     className: "wk-lab"
-  }, "Calories")))), skipOpen && /*#__PURE__*/React.createElement("div", {
+  }, "Calories"))) : /*#__PURE__*/React.createElement("div", {
+    className: "empty-week"
+  }, "Your week starts with today's session. Finish it and this fills up. 🏃")), readyOpen && /*#__PURE__*/React.createElement("div", {
+    className: "sheet-scrim",
+    onClick: () => setReadyOpen(false)
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "sheet",
+    role: "dialog",
+    "aria-label": "Ready check",
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "sheet-grip"
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "sheet-title"
+  }, "Quick check before you go"), /*#__PURE__*/React.createElement("div", {
+    className: "sheet-sub"
+  }, "Feeling good to move today — no sharp pain or dizziness", injury ? `, especially your ${injury.toLowerCase()}` : "", "?"), /*#__PURE__*/React.createElement("div", {
+    className: "cycle-banner",
+    style: {
+      background: C.blue + "12",
+      border: "1px solid " + C.blue + "33",
+      color: C.textSecondary,
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("span", null, "🔒"), /*#__PURE__*/React.createElement("span", null, "Clip the treadmill safety key to your waistband before you start.")), /*#__PURE__*/React.createElement("button", {
+    className: "btn-primary",
+    onClick: () => {
+      setReadyOpen(false);
+      onStart(day);
+    }
+  }, "I'm good — let's go"), /*#__PURE__*/React.createElement("button", {
+    className: "btn-soft",
+    onClick: () => {
+      setReadyOpen(false);
+    }
+  }, "Not today"))), skipOpen && /*#__PURE__*/React.createElement("div", {
     className: "sheet-scrim",
     onClick: () => setSkipOpen(false)
   }, /*#__PURE__*/React.createElement("div", {
@@ -1831,7 +1936,7 @@ function TodayScreen({
     className: "sheet-opt",
     onClick: () => {
       setSkipOpen(false);
-      onStart(day);
+      setReadyOpen(true);
     }
   }, /*#__PURE__*/React.createElement("span", {
     className: "si"
