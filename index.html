@@ -1866,12 +1866,14 @@ function WorkoutMode({
   const doneRef = useRef(false);
   const ivRef = useRef(null);
   const elapsedRef = useRef(0);
+  const distRef = useRef(0);
   useEffect(() => {
     if (phase !== "run") return;
     ivRef.current = setInterval(() => {
       if (pausedRef.current || doneRef.current) return;
       secsRef.current -= 1;
       elapsedRef.current += 1;
+      distRef.current += (intervals[idxRef.current].speed || 0) / 3600; // miles this second
       setDisplaySecs(secsRef.current);
       setElapsed(elapsedRef.current);
       if (secsRef.current <= 0) {
@@ -1902,7 +1904,7 @@ function WorkoutMode({
   }[iv.type] || ["4", "Steady."];
   const totalSecsPlan = intervals.reduce((s, i) => s + i.duration * 60, 0);
   const showBreathe = iv.type === "run" || iv.breath;
-  const liveCals = Math.round(elapsed / 60 * ((profile.currentWeight || 170) * 0.00095) * 11);
+  const liveDist = distRef.current;
   const [ci, setCi] = useState({
     energy: "",
     soreness: "",
@@ -2114,6 +2116,7 @@ function WorkoutMode({
       profile: profile,
       minutes: Math.round(elapsedRef.current / 60),
       cals: calcCals(),
+      miles: distRef.current,
       intervals: intervals.length,
       onDone: () => onFinish({
         complete: true
@@ -2181,9 +2184,9 @@ function WorkoutMode({
     style: {
       color: C.orange
     }
-  }, liveCals), /*#__PURE__*/React.createElement("div", {
+  }, liveDist.toFixed(2)), /*#__PURE__*/React.createElement("div", {
     className: "tread-l"
-  }, "🔥 kcal")))), iv.type === "run" && /*#__PURE__*/React.createElement("div", {
+  }, "Miles")))), iv.type === "run" && /*#__PURE__*/React.createElement("div", {
     className: "emerg",
     role: "alert"
   }, "🛑 Sharp pain or dizziness? Straddle the belt and stop. No workout is worth an injury."), /*#__PURE__*/React.createElement("div", {
@@ -2238,6 +2241,7 @@ function CompletionScreen({
   profile,
   minutes,
   cals,
+  miles,
   intervals,
   onDone
 }) {
@@ -2260,6 +2264,12 @@ function CompletionScreen({
     className: "done-stat"
   }, /*#__PURE__*/React.createElement("div", {
     className: "n"
+  }, (miles || 0).toFixed(2)), /*#__PURE__*/React.createElement("div", {
+    className: "l"
+  }, "Miles")), /*#__PURE__*/React.createElement("div", {
+    className: "done-stat"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "n"
   }, minutes), /*#__PURE__*/React.createElement("div", {
     className: "l"
   }, "Minutes")), /*#__PURE__*/React.createElement("div", {
@@ -2268,13 +2278,7 @@ function CompletionScreen({
     className: "n"
   }, cals), /*#__PURE__*/React.createElement("div", {
     className: "l"
-  }, "Calories")), /*#__PURE__*/React.createElement("div", {
-    className: "done-stat"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "n"
-  }, intervals), /*#__PURE__*/React.createElement("div", {
-    className: "l"
-  }, "Intervals"))), /*#__PURE__*/React.createElement("div", {
+  }, "Calories"))), /*#__PURE__*/React.createElement("div", {
     style: {
       width: "100%",
       maxWidth: 320
@@ -2302,11 +2306,11 @@ function CompletionScreen({
     className: "sc-t"
   }, "CoachMile · Session Complete 🏃"), /*#__PURE__*/React.createElement("div", {
     className: "sc-row"
+  }, /*#__PURE__*/React.createElement("span", null, "Distance"), /*#__PURE__*/React.createElement("span", null, (miles || 0).toFixed(2), " mi")), /*#__PURE__*/React.createElement("div", {
+    className: "sc-row"
   }, /*#__PURE__*/React.createElement("span", null, "Duration"), /*#__PURE__*/React.createElement("span", null, minutes, " min")), /*#__PURE__*/React.createElement("div", {
     className: "sc-row"
   }, /*#__PURE__*/React.createElement("span", null, "Calories"), /*#__PURE__*/React.createElement("span", null, cals, " kcal")), /*#__PURE__*/React.createElement("div", {
-    className: "sc-row"
-  }, /*#__PURE__*/React.createElement("span", null, "Intervals"), /*#__PURE__*/React.createElement("span", null, intervals)), /*#__PURE__*/React.createElement("div", {
     className: "sc-tag"
   }, profile.name || "A runner", " is one mile closer. #CoachMile")), /*#__PURE__*/React.createElement("button", {
     className: "btn-primary",
