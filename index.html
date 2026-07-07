@@ -6552,6 +6552,41 @@ function ProfileScreen({
   }, "How CoachMile works"), /*#__PURE__*/React.createElement("div", {
     className: "prof-val dim"
   }, "›")), /*#__PURE__*/React.createElement("div", {
+  className: "prof-row"
+}, /*#__PURE__*/React.createElement("div", {
+  className: "prof-lab"
+}, "Language"), /*#__PURE__*/React.createElement("div", {
+  style: {
+    display: "flex",
+    gap: 7
+  }
+}, ["en", "es"].map(function (l) {
+  var on = function () {
+    try {
+      return (localStorage.getItem('coachmile_lang') || 'en') === l;
+    } catch (e) {
+      return l === 'en';
+    }
+  }();
+  return /*#__PURE__*/React.createElement("button", {
+    key: l,
+    onClick: function () {
+      try {
+        localStorage.setItem('coachmile_lang', l);
+      } catch (e) {}
+      location.reload();
+    },
+    style: {
+      padding: "7px 14px",
+      borderRadius: 10,
+      fontSize: 12.5,
+      fontWeight: 600,
+      border: "1.5px solid " + (on ? C.orange : C.border),
+      background: on ? C.orange + "14" : C.card,
+      color: on ? C.orange : C.textPrimary
+    }
+  }, l === 'en' ? 'EN' : 'ES');
+}))), /*#__PURE__*/React.createElement("div", {
     className: "prof-row"
   }, /*#__PURE__*/React.createElement("div", {
     className: "prof-lab dim"
@@ -7305,6 +7340,141 @@ ReactDOM.createRoot(document.getElementById("root")).render(/*#__PURE__*/React.c
     '<div style="color:#FF6B35;font-family:monospace;padding:40px;font-size:13px;white-space:pre-wrap;line-height:1.6">CoachMile failed to start:\n\n' +
     (err && err.stack ? err.stack : String(err)).replace(/</g,'&lt;') + '</div>';
 }
+</script>
+<script>
+(function(){
+  var ES = {
+    // nav + topbar
+    "Today":"Hoy","Train":"Entrena","Food":"Comida","Progress":"Progreso","You":"Tú",
+    "Good morning":"Buenos días","Good afternoon":"Buenas tardes","Good evening":"Buenas noches",
+    "Runner":"Corredor","Your profile":"Tu perfil","Open profile":"Abrir perfil",
+    // energy check-in
+    "How's your energy today?":"¿Cómo está tu energía hoy?","High":"Alta","Okay":"Bien","Low":"Baja",
+    // streak / mission
+    "Day streak":"Días seguidos","Missed day protected":"Día perdido protegido",
+    "Run Intervals":"Intervalos de carrera","Bodyweight Strength":"Fuerza con peso corporal",
+    "guided":"guiado","walk/run":"caminar/correr","start at":"empieza a",
+    "We'll guide every interval — just follow the cues.":"Te guiamos en cada intervalo. Solo sigue las señales.",
+    "rounds":"rondas","moves":"movimientos",
+    "START WORKOUT":"EMPEZAR","START WALK":"EMPEZAR CAMINATA","START STRENGTH":"EMPEZAR FUERZA","START SESSION":"EMPEZAR SESIÓN",
+    "Not feeling it today? That's okay →":"¿Sin ganas hoy? No pasa nada →",
+    "Deload · lighter on purpose":"Semana suave · a propósito","Deload week — easy on purpose":"Semana suave, fácil a propósito",
+    // habits + week
+    "Today's habits":"Hábitos de hoy","Complete today's workout":"Completa el entrenamiento de hoy",
+    "Hit your water goal":"Alcanza tu meta de agua","5 min post-run stretch":"5 min de estiramiento tras correr",
+    "Log how you feel":"Registra cómo te sientes","This week":"Esta semana",
+    "Workouts":"Entrenamientos","Minutes":"Minutos","Calories":"Calorías",
+    "Your week starts with today's session. Finish it and this fills up. 🏃":"Tu semana empieza con la sesión de hoy. Complétala y esto se va llenando. 🏃",
+    // ready sheet
+    "Quick check before you go":"Un chequeo rápido antes de empezar","I'm good — let's go":"Estoy bien, vamos","Not today":"Hoy no",
+    "Clip the treadmill safety key to your waistband before you start.":"Engancha la llave de seguridad de la caminadora a tu cintura antes de empezar.",
+    // skip sheet
+    "Not feeling it? Let's adjust.":"¿Sin ganas? Ajustemos.","Showing up beats being perfect. Any of these still counts.":"Presentarte vale más que ser perfecto. Cualquiera de estas cuenta.",
+    "Just 5 minutes (keeps your streak)":"Solo 5 minutos (mantiene tu racha)","Do a shorter version":"Haz una versión más corta",
+    "Walk-only session":"Sesión solo de caminata","Swap to a rest day":"Cámbialo por día de descanso","Push through it":"Dale con todo",
+    // resume / comeback
+    "Resume your run?":"¿Retomar tu carrera?","Resume":"Retomar","You have a session in progress — pick up where you left off.":"Tienes una sesión en curso. Continúa donde la dejaste.",
+    "Welcome back":"Bienvenido de vuelta","Ease back in":"Vuelve con calma",
+    // workout screen
+    "Pause":"Pausa","Resume ":"Reanuda","Finish":"Terminar","Exit workout":"Salir del entreno",
+    "Target pace ":"Ritmo objetivo ","Up next · ":"Sigue · ","Finish 🎉":"Terminar 🎉","Adjust":"Ajustar",
+    "Speed mph":"Velocidad mph","Speed km/h":"Velocidad km/h","Incline %":"Inclinación %","Miles":"Millas","Km":"Km",
+    "Warm-up walk":"Caminata de calentamiento","Easy jog to warm up":"Trote suave para calentar","Cool-down walk":"Caminata de enfriamiento","Cool-down jog to walk":"Trote a caminata de enfriamiento","Recovery walk":"Caminata de recuperación","Recovery":"Recuperación","Walk":"Caminar","Run":"Correr","Easy jog":"Trote suave","Steady run":"Carrera constante","Tempo — comfortably hard":"Tempo, cómodo pero exigente","Interval — hard":"Intervalo, fuerte","Hill push":"Subida","Walk down":"Baja caminando","Surge":"Acelerón","Float easy":"Suelta suave","Stride (relaxed & fast)":"Zancada (suelta y rápida)","Easy":"Suave","Mindful breathing":"Respiración consciente","Brisk walk":"Caminata enérgica","Incline power walk":"Caminata con inclinación","Easy steady walk":"Caminata suave constante","Steady walk":"Caminata constante","Move":"Muévete",
+    "🛑 Sharp pain or dizziness? Straddle the belt and stop. No workout is worth an injury.":"🛑 ¿Dolor agudo o mareo? Súbete a los lados de la banda y detente. Ningún entreno vale una lesión.",
+    "♥ Connect heart rate":"♥ Conectar frecuencia cardíaca",
+    // checkin
+    "Nice work. Quick check-in?":"¡Bien hecho! ¿Un chequeo rápido?","This teaches CoachMile how to adapt your next session.":"Esto le enseña a CoachMile cómo adaptar tu próxima sesión.","This teaches CoachMile how to shape your next few days.":"Esto le enseña a CoachMile cómo ajustar tus próximos días.",
+    "Energy":"Energía","Soreness":"Dolor muscular","Mood":"Ánimo","Fresh":"Fresco","Tight":"Tenso","Sore":"Adolorido",
+    "Continue to stretch →":"Continuar al estiramiento →","Skip stretch":"Saltar estiramiento","Continue":"Continuar",
+    // stretch
+    "Quad Stretch":"Estiramiento de cuádriceps","Hip Flexor":"Flexor de cadera","Calf Stretch":"Estiramiento de pantorrilla","IT Band":"Banda iliotibial","Breath Reset":"Reinicio de respiración","Rest":"Descanso",
+    "Skip →":"Saltar →","Finish stretch":"Terminar estiramiento",
+    // completion
+    "Workout done.":"Entreno terminado.","Strength done.":"Fuerza terminada.","Rounds":"Rondas","Share this workout":"Comparte este entreno","Back to home":"Volver al inicio","Done":"Listo","Share Workout":"Compartir entreno",
+    // bodyweight
+    "Do all 3 rounds. Rest about 30 seconds between them.":"Haz las 3 rondas. Descansa unos 30 segundos entre ellas.","Do all 4 rounds. Rest about 30 seconds between them.":"Haz las 4 rondas. Descansa unos 30 segundos entre ellas.",
+    "Move with control. Quality beats speed here.":"Muévete con control. Aquí la técnica vale más que la velocidad.","Rest":"Descanso","Shake it out. Round 2 of 3 is next.":"Sacúdete. Sigue la ronda 2 de 3.",
+    "Bodyweight squats":"Sentadillas","Glute bridges":"Puentes de glúteo","Reverse lunges":"Zancadas hacia atrás","Push-ups":"Flexiones","Calf raises":"Elevaciones de pantorrilla","Side plank":"Plancha lateral",
+    "12 reps":"12 reps","15 reps":"15 reps","10 each leg":"10 por pierna","as many as good form":"las que puedas con buena técnica","20 reps":"20 reps","hold 20 sec each side":"aguanta 20 seg por lado",
+    // train
+    "This week":"Esta semana","Full 12 weeks":"Las 12 semanas","Rest & Recover":"Descanso y recuperación","Full recovery. Light walk optional.":"Recuperación total. Caminata ligera opcional.",
+    "Why the walk days matter":"Por qué importan los días de caminata","Treadmill tip":"Consejo de caminadora",
+    "Your 12 weeks · 3 blocks":"Tus 12 semanas · 3 bloques","This week":"Esta semana","Deload":"Semana suave","Graduation 🎓":"Graduación 🎓",
+    "Runner strength — legs, glutes, core":"Fuerza para corredores: piernas, glúteos, core",
+    // food
+    "This week's focus":"El enfoque de esta semana","Your coach · behavior tip":"Tu coach · consejo de hábitos","Water goal":"Meta de agua","bottles":"botellas",
+    "The plate, not the scale":"El plato, no la báscula","fill this first":"llena esto primero","a palm-sized portion":"una porción del tamaño de tu palma","rice, potato, bread":"arroz, papa, pan",
+    "Breakfast":"Desayuno","Lunch":"Almuerzo","Dinner":"Cena","Meal 1":"Comida 1","Meal 2":"Comida 2","Meal 3":"Comida 3","Snack":"Snack",
+    "From the nutritionists":"De los nutricionistas","Nutrition, explained":"Nutrición, explicada","Straight talk on food. No calorie counting. Tap a topic to open it.":"Comida sin rodeos. Sin contar calorías. Toca un tema para abrirlo.",
+    "Your nutrition coach":"Tu coach de nutrición","Build your week of meals":"Arma tu semana de comidas","This week's meals":"Las comidas de esta semana","Build my week":"Arma mi semana","Shuffle a new week":"Baraja una nueva semana","Edit":"Editar","Cancel":"Cancelar",
+    "How do you eat?":"¿Cómo comes?","Anything":"De todo","Vegetarian":"Vegetariano","Pescatarian":"Pescetariano","Vegan":"Vegano","Anything to leave out?":"¿Algo que dejar fuera?","Dairy":"Lácteos","Gluten":"Gluten","Nuts":"Frutos secos","Eggs":"Huevos","Shellfish":"Mariscos","Pork":"Cerdo","Time to cook?":"¿Tiempo para cocinar?","Barely any":"Casi nada","Some":"Algo","I like cooking":"Me gusta cocinar","Grocery budget?":"¿Presupuesto?","Tight":"Ajustado","Normal":"Normal","Flexible":"Flexible",
+    "Run day":"Día de carrera","Walk day":"Día de caminata","Rest day":"Día de descanso","carbs before, protein after":"carbos antes, proteína después",
+    "Fuel your run (timing)":"Combustible para correr (cuándo)","What to eat around a run":"Qué comer alrededor de una carrera","Getting enough protein":"Comer suficiente proteína","Carbs aren't the enemy":"Los carbos no son el enemigo","Water and electrolytes":"Agua y electrolitos","Iron and the minerals runners miss":"El hierro y los minerales que faltan a los corredores","Iron and the minerals women runners miss":"El hierro y los minerales que faltan a las corredoras","Swaps that actually stick":"Cambios que sí se mantienen","Eat to your hunger, not the clock":"Come según tu hambre, no según el reloj","Fueling a longer run":"Alimentar una carrera larga",
+    // progress
+    "Total workouts":"Entrenos totales","Weight lost":"Peso perdido","Total minutes":"Minutos totales","Workout history":"Historial de entrenos","logged":"registrados","Finish your first session and it shows up here. Every run, kept.":"Termina tu primera sesión y aparecerá aquí. Cada carrera, guardada.",
+    "Weight log":"Registro de peso","entries":"registros","Recovery score · last 7 check-ins":"Puntaje de recuperación · últimos 7 registros","Mood trend · from your check-ins":"Tendencia de ánimo · de tus registros","Milestones":"Metas",
+    "Your running numbers":"Tus números de carrera","Fastest pace":"Ritmo más rápido","Longest run":"Carrera más larga","Best week":"Mejor semana","Total climb":"Desnivel total","Weekly mileage · last 6 weeks":"Kilometraje semanal · últimas 6 semanas","Weekly distance · last 6 weeks":"Distancia semanal · últimas 6 semanas",
+    // profile
+    "Show body metrics":"Mostrar métricas corporales","Body mass index · estimate":"Índice de masa corporal · estimado","Hide":"Ocultar","BMI is a rough screen, not a verdict — it ignores muscle and build. Your consistency matters more.":"El IMC es una guía aproximada, no un veredicto. Ignora el músculo y la complexión. Tu constancia importa más.",
+    "Your details":"Tus datos","Name":"Nombre","Height":"Estatura","Current weight":"Peso actual","Goal weight":"Peso meta","Running level":"Nivel de carrera","Can run for":"Puede correr","Goals":"Metas","Session length":"Duración de sesión","Days / week":"Días / semana","Cycle phase":"Fase del ciclo",
+    "Settings":"Ajustes","Training focus":"Enfoque de entrenamiento","Blends bodyweight strength days into your week. Change it anytime and your plan rebuilds around it.":"Mezcla días de fuerza con peso corporal en tu semana. Cámbialo cuando quieras y tu plan se reorganiza.",
+    "Light theme":"Tema claro","Larger text":"Texto más grande","Language":"Idioma","Version":"Versión",
+    "Your data":"Tus datos","Everything is stored on this device. Back it up so you don't lose your history if you clear your browser or switch phones.":"Todo se guarda en este dispositivo. Haz una copia para no perder tu historial si limpias el navegador o cambias de teléfono.","⬇ Export backup":"⬇ Exportar copia","⬆ Import backup":"⬆ Importar copia","Reset all data":"Borrar todos los datos",
+    // onboarding
+    "Welcome to CoachMile":"Bienvenido a CoachMile","What should we call you?":"¿Cómo te llamamos?","Just a first name is perfect.":"Con tu nombre basta.","Your name":"Tu nombre",
+    "Which best describes you?":"¿Qué te describe mejor?","This tailors your coaching and recovery cues.":"Esto ajusta tu coaching y tus señales de recuperación.","Male":"Hombre","Female":"Mujer","Other":"Otro",
+    "How old are you?":"¿Qué edad tienes?","years old":"años","How tall are you?":"¿Cuánto mides?","We use this for your BMI and a healthy weight range — no guessing.":"Lo usamos para tu IMC y un rango de peso saludable, sin adivinar.",
+    "Current weight?":"¿Peso actual?","Goal weight?":"¿Peso meta?","lbs":"lb","How's your running right now?":"¿Cómo corres ahora mismo?","This picks your plan variant.":"Esto elige tu tipo de plan.","Can't run yet":"Aún no puedo correr","I run a little":"Corro un poco","Comfortable runner":"Corredor cómodo",
+    "How long can you run without stopping?":"¿Cuánto puedes correr sin parar?","Under 5 min":"Menos de 5 min","5–10 min":"5–10 min","10–20 min":"10–20 min","20–30 min":"20–30 min","30+ min":"30+ min",
+    "What are your goals?":"¿Cuáles son tus metas?","Pick up to 3 — your plan adapts to what you choose.":"Elige hasta 3. Tu plan se adapta a lo que elijas.","Lose weight":"Bajar de peso","Build endurance":"Ganar resistencia","Feel healthier":"Sentirte más sano","Reduce stress":"Reducir el estrés",
+    "In a sentence — why this, why now?":"En una frase, ¿por qué esto y por qué ahora?","Any injuries or pain we should respect?":"¿Alguna lesión o dolor que debamos respetar?","None":"Ninguna","Knees":"Rodillas","Back":"Espalda","Ankles / feet":"Tobillos / pies",
+    "Days per week you can train?":"¿Días por semana que puedes entrenar?","days / week":"días / semana","How long per session?":"¿Cuánto por sesión?","minutes / session":"minutos / sesión",
+    "Any of these sound like you?":"¿Te suena alguna de estas?","Pick up to 3. This shapes your food coaching.":"Elige hasta 3. Esto ajusta tu coaching de comida.","Skip breakfast":"Salto el desayuno","Late-night snacking":"Picoteo nocturno","Sugary drinks":"Bebidas azucaradas","Eat out often":"Como fuera seguido","Emotional eating":"Como por emoción","Big portions":"Porciones grandes",
+    "Next":"Siguiente","Continue →":"Continuar →","Here's what we heard":"Esto es lo que entendimos","Tap anything to fix it before we build your plan.":"Toca lo que quieras corregir antes de armar tu plan.","Looks right → continue":"Se ve bien → continuar",
+    "Quick safety check":"Chequeo de seguridad rápido","A standard PAR-Q. Your answers stay on this screen only and are never saved.":"Un PAR-Q estándar. Tus respuestas se quedan solo en esta pantalla y nunca se guardan.","No":"No","Yes":"Sí","Build my plan":"Arma mi plan","I understand — build a gentle plan":"Entiendo, arma un plan suave",
+    "Building your plan":"Armando tu plan",
+    // achievements
+    "Achievement Unlocked":"Logro desbloqueado","Let's go":"¡Vamos!","Showed Up":"Te presentaste","First Workout":"Primer entreno","Quarter Hour":"Cuarto de hora","First Mile":"Primera milla","3-Day Streak":"Racha de 3 días","7-Day Streak":"Racha de 7 días","Ten Sessions":"Diez sesiones","5K Distance":"Distancia 5K","Graduate":"Graduado",
+    // misc
+    "Two quiet wins":"Dos triunfos silenciosos"
+  };
+  // dynamic patterns (name/number captured)
+  var RULES = [
+    {re:/^Step (\d+) of (\d+)$/, es:function(m){return "Paso "+m[1]+" de "+m[2];}},
+    {re:/^Week (\d+) of (\d+)$/, es:function(m){return "Semana "+m[1]+" de "+m[2];}},
+    {re:/^Week (\d+) · (.+) block · Plan (.+)$/, es:function(m){return "Semana "+m[1]+" · bloque "+m[2]+" · Plan "+m[3];}},
+    {re:/^Round (\d+) done · take a breath$/i, es:function(m){return "Ronda "+m[1]+" hecha · respira";}},
+    {re:/^Good to see you, (.+?)\. Remember, (.+?)\. Let's roll\.$/, es:function(m){var why=ES[m[2]]||m[2];return "Hola de nuevo, "+m[1]+". Recuerda, "+why+". ¡Vamos!";}},
+    {re:/^You're charged up, (.+?), and (.+?)\. Let's make it count\.$/, es:function(m){var why=ES[m[2]]||m[2];return "Estás con toda la energía, "+m[1]+", y "+why+". Que valga la pena.";}}
+  ];
+  var whyMap = {
+    "every honest session moves you toward your goal weight":"cada sesión te acerca a tu peso meta",
+    "today builds your endurance up a little more":"hoy tu resistencia sube un poco más",
+    "this is your time to move and clear your head":"este es tu momento para moverte y despejar la mente",
+    "today's another chance to stack one honest session":"hoy es otra oportunidad de sumar una sesión honesta"
+  };
+  for(var k in whyMap) ES[k]=whyMap[k];
+
+  var lang = (function(){try{return localStorage.getItem('coachmile_lang')||'en';}catch(e){return 'en';}})();
+  function tNode(t){
+    var s=t.nodeValue; if(!s) return; var key=s.trim(); if(!key) return;
+    if(ES.hasOwnProperty(key)){ var out=s.replace(key,ES[key]); if(t.nodeValue!==out) t.nodeValue=out; return; }
+    for(var i=0;i<RULES.length;i++){ var mm=key.match(RULES[i].re); if(mm){ var o=RULES[i].es(mm); if(o){ var r=s.replace(key,o); if(t.nodeValue!==r) t.nodeValue=r; } return; } }
+  }
+  function tAll(root){
+    if(lang!=='es'||!root) return;
+    var wk=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,null), n, arr=[]; while(n=wk.nextNode())arr.push(n); arr.forEach(tNode);
+    var ph=root.querySelectorAll('[placeholder]'); for(var i=0;i<ph.length;i++){var kk=(ph[i].getAttribute('placeholder')||'').trim(); if(ES[kk])ph[i].setAttribute('placeholder',ES[kk]);}
+  }
+  var sched=false;
+  function schedule(){ if(sched)return; sched=true; (window.requestAnimationFrame||window.setTimeout)(function(){sched=false; tAll(document.getElementById('root'));},16); }
+  var obs=null;
+  function start(){ var root=document.getElementById('root'); if(!root)return; if(!obs){obs=new MutationObserver(schedule);} obs.observe(root,{childList:true,subtree:true,characterData:true}); schedule(); }
+  window.__cmLang=function(){return lang;};
+  window.__cmSetLang=function(l){ try{localStorage.setItem('coachmile_lang',l);}catch(e){} if(l==='es'){lang='es'; start();} else { lang='en'; try{location.reload();}catch(e){} } };
+  if(lang==='es'){ if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',function(){setTimeout(start,60);});} else {setTimeout(start,60);} }
+})();
+
 </script>
 </body>
 </html>
