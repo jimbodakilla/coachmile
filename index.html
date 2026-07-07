@@ -1061,6 +1061,57 @@ function buildRunDay(variant, goals, timeTarget, runDuration, week, shape, deloa
   };
 }
 
+/* #2 advanced workouts for graduates / stronger runners — real runner sessions, not just walk/run */
+function advEasy(variant) { return variant === "C" ? 5.8 : variant === "B" ? 5.2 : 4.6; }
+function progWarmup(easy) {
+  return [{ type: "warmup", name: "Warm-up walk", duration: 3, speed: 3.2, incline: 0 },
+          { type: "warmup", name: "Easy jog to warm up", duration: 3, speed: +(easy - 0.6).toFixed(1), incline: 1 }];
+}
+function strideSet(easy) {
+  const out = [];
+  for (let i = 0; i < 4; i++) {
+    out.push({ type: "run", name: "Stride (relaxed & fast)", duration: 0.5, speed: +(easy + 1.8).toFixed(1), incline: 0 });
+    out.push({ type: "walk", name: "Easy", duration: 0.5, speed: 3.2, incline: 0 });
+  }
+  return out;
+}
+const ADV_COOL = { type: "cool", name: "Cool-down jog to walk", duration: 5, speed: 3.4, incline: 0 };
+function buildTempo(variant, timeTarget) {
+  const easy = advEasy(variant), tempo = +(easy + 0.8).toFixed(1);
+  const t = Math.max(8, Math.min(24, (timeTarget || 40) - 14));
+  return { ivs: [...progWarmup(easy), { type: "run", name: "Tempo — comfortably hard", duration: t, speed: tempo, incline: 1 }, ADV_COOL],
+           title: "Tempo Run", focus: t + " min comfortably hard" };
+}
+function buildIntervals(variant, timeTarget) {
+  const easy = advEasy(variant), hard = +(easy + 1.4).toFixed(1);
+  const reps = Math.max(4, Math.min(8, Math.round(((timeTarget || 40) - 16) / 4)));
+  const ivs = [...progWarmup(easy), ...strideSet(easy)];
+  for (let i = 0; i < reps; i++) { ivs.push({ type: "run", name: "Interval — hard", duration: 2, speed: hard, incline: 0.5 }); ivs.push({ type: "walk", name: "Recovery", duration: 2, speed: 3.3, incline: 0 }); }
+  ivs.push(ADV_COOL);
+  return { ivs, title: "Interval Session", focus: reps + " × 2 min hard" };
+}
+function buildHills(variant, timeTarget) {
+  const easy = advEasy(variant), hillSpeed = +(easy - 0.4).toFixed(1);
+  const reps = Math.max(5, Math.min(10, Math.round(((timeTarget || 40) - 14) / 3)));
+  const ivs = [...progWarmup(easy)];
+  for (let i = 0; i < reps; i++) { ivs.push({ type: "run", name: "Hill push", duration: 1, speed: hillSpeed, incline: 6 }); ivs.push({ type: "walk", name: "Walk down", duration: 1.5, speed: 3.2, incline: 0 }); }
+  ivs.push(ADV_COOL);
+  return { ivs, title: "Hill Repeats", focus: reps + " × 1 min at 6% incline" };
+}
+function buildFartlek(variant, timeTarget) {
+  const easy = advEasy(variant);
+  const ivs = [...progWarmup(easy)];
+  const surges = [[1, easy + 1.2], [2, easy + 0.6], [0.5, easy + 1.8], [3, easy + 0.4], [1, easy + 1.2]];
+  const cycles = Math.max(1, Math.round(((timeTarget || 40) - 14) / 7.5));
+  for (let c = 0; c < cycles; c++) surges.forEach((sr, k) => ivs.push({ type: "run", name: k % 2 ? "Float easy" : "Surge", duration: sr[0], speed: +sr[1].toFixed(1), incline: 0.5 }));
+  ivs.push(ADV_COOL);
+  return { ivs, title: "Fartlek", focus: "Play with pace — surge and float" };
+}
+const ADV_ROTATION = ["tempo", "intervals", "hills", "fartlek"];
+function buildAdvanced(kind, variant, timeTarget) {
+  return kind === "tempo" ? buildTempo(variant, timeTarget) : kind === "intervals" ? buildIntervals(variant, timeTarget) : kind === "hills" ? buildHills(variant, timeTarget) : buildFartlek(variant, timeTarget);
+}
+
 // Treadmill walk session (replaces strength days — this app is treadmill-only)
 function buildWalkDay(goals, timeTarget) {
   const loseW = goals.includes("Lose weight");
@@ -1186,10 +1237,20 @@ function buildPlan(profile, lastCheckin, opts) {
       recoveryNote = "You logged sore + low energy last time, so today is a lighter recovery-style run.";
     }
     const shape = shapeByIdx[i] || "quality";
-    const built = buildRunDay(variant, goals, timeTarget, runDuration, week, shape, deload);
-    built.ivs = tuneDay(built.ivs, profile, cycleEase);
-    const title = shapeTitle(shape, deload, grad);
-    const focus = deload ? "Deload week — easy on purpose" : grad ? "Taper & graduate" : goals.length ? goals.slice(0, 2).join(" · ") : PLAN_VARIANTS[variant].tag;
+    let built, title, focus;
+    const advEligible = variant !== "A" && week >= 5 && !deload && !grad && shape === "quality";
+    if (advEligible) {
+      const kind = ADV_ROTATION[(week + i) % ADV_ROTATION.length];
+      const a = buildAdvanced(kind, variant, timeTarget);
+      built = { ivs: tuneDay(a.ivs, profile, cycleEase), mods: ["advanced session"] };
+      title = a.title;
+      focus = a.focus;
+    } else {
+      built = buildRunDay(variant, goals, timeTarget, runDuration, week, shape, deload);
+      built.ivs = tuneDay(built.ivs, profile, cycleEase);
+      title = shapeTitle(shape, deload, grad);
+      focus = deload ? "Deload week — easy on purpose" : grad ? "Taper & graduate" : goals.length ? goals.slice(0, 2).join(" · ") : PLAN_VARIANTS[variant].tag;
+    }
     return {
       ...meta,
       day: dow[i],
@@ -1199,7 +1260,7 @@ function buildPlan(profile, lastCheckin, opts) {
       mods: built.mods,
       title,
       intervals: built.ivs,
-      totalMin: totalMinutes(built.ivs),
+      totalMin: Math.round(totalMinutes(built.ivs)),
       focus,
       recoveryNote
     };
@@ -2829,6 +2890,34 @@ function WorkoutMode({
   const cueCtxRef = useRef(null);
   const metroRef = useRef(null);
   const [cadenceOn, setCadenceOn] = useState(false);
+  // #7 mid-run manual speed adjust (session-wide offset, mph)
+  const [spdAdj, setSpdAdj] = useState(0);
+  const spdAdjRef = useRef(0);
+  const bumpSpeed = dv => setSpdAdj(v => { const nv = +Math.max(-2, Math.min(2, v + dv)).toFixed(1); spdAdjRef.current = nv; haptic(); return nv; });
+  // #9 heart rate via Web Bluetooth (best-effort; needs a BLE strap + https)
+  const [hr, setHr] = useState(null);
+  const hrDevRef = useRef(null);
+  const hrSupported = typeof navigator !== "undefined" && navigator.bluetooth;
+  const connectHR = async () => {
+    try {
+      const dev = await navigator.bluetooth.requestDevice({ filters: [{ services: ["heart_rate"] }] });
+      hrDevRef.current = dev;
+      const server = await dev.gatt.connect();
+      const svc = await server.getPrimaryService("heart_rate");
+      const ch = await svc.getCharacteristic("heart_rate_measurement");
+      await ch.startNotifications();
+      ch.addEventListener("characteristicvaluechanged", e => {
+        const v = e.target.value;
+        const flags = v.getUint8(0);
+        setHr(flags & 1 ? v.getUint16(1, true) : v.getUint8(1));
+      });
+    } catch (e) {}
+  };
+  useEffect(() => () => { try { if (hrDevRef.current && hrDevRef.current.gatt.connected) hrDevRef.current.gatt.disconnect(); } catch (e) {} }, []);
+  const hrZone = hr == null ? null : (() => {
+    const max = 220 - (profile.age || 35), pct = hr / max;
+    return pct < 0.6 ? { z: 1, l: "Easy", c: C.blue } : pct < 0.7 ? { z: 2, l: "Aerobic", c: C.green } : pct < 0.8 ? { z: 3, l: "Tempo", c: C.yellow } : pct < 0.9 ? { z: 4, l: "Threshold", c: C.orange } : { z: 5, l: "Max", c: C.red };
+  })();
   // #15 cadence metronome — soft tick at 175 spm during run intervals
   const tickClick = () => {
     try {
@@ -2919,7 +3008,7 @@ function WorkoutMode({
       if (doneRef.current || pausedRef.current) return;
       const now = Date.now();
       const curDur = intervals[idxRef.current].duration * 60;
-      const spd = intervals[idxRef.current].speed || 0;
+      const spd = Math.max(0, (intervals[idxRef.current].speed || 0) + spdAdjRef.current);
       const segEl = Math.max(0, (now - segStartRef.current) / 1000);
       if (segEl >= curDur) {
         completedSecsRef.current += curDur;
@@ -2968,6 +3057,7 @@ function WorkoutMode({
   }, [phase]);
   const iv = intervals[curIdx];
   const phaseColor = ivColor(C, iv.type);
+  const effSpeed = Math.max(0, (iv.speed || 0) + spdAdj);
   const mm = String(Math.floor(displaySecs / 60)).padStart(2, "0");
   const ss = String(Math.max(0, displaySecs % 60)).padStart(2, "0");
   const rpe = {
@@ -3280,7 +3370,7 @@ function WorkoutMode({
     className: "tread-cell"
   }, /*#__PURE__*/React.createElement("div", {
     className: "tread-n"
-  }, isMetric(profile) ? (iv.speed * 1.60934).toFixed(1) : (iv.speed || 0).toFixed(1)), /*#__PURE__*/React.createElement("div", {
+  }, isMetric(profile) ? (effSpeed * 1.60934).toFixed(1) : effSpeed.toFixed(1)), /*#__PURE__*/React.createElement("div", {
     className: "tread-l"
   }, "Speed ", isMetric(profile) ? "km/h" : "mph")), /*#__PURE__*/React.createElement("div", {
     className: "tread-cell"
@@ -3307,7 +3397,83 @@ function WorkoutMode({
     }
   }, "Target pace ", /*#__PURE__*/React.createElement("b", {
     style: { color: C.textPrimary }
-  }, paceStr(iv.speed, profile)), " · ", cadenceTarget(iv.speed), " spm"), /*#__PURE__*/React.createElement("div", {
+  }, paceStr(effSpeed, profile)), " · ", cadenceTarget(effSpeed), " spm"), /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+  style: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 14,
+    marginTop: 14
+  }
+}, /*#__PURE__*/React.createElement("button", {
+  "aria-label": "Slow down",
+  onClick: () => bumpSpeed(-0.1),
+  style: {
+    width: 42,
+    height: 42,
+    borderRadius: "50%",
+    background: C.card,
+    border: "1.5px solid " + C.border,
+    color: C.textPrimary,
+    fontSize: 22,
+    fontWeight: 700
+  }
+}, "−"), /*#__PURE__*/React.createElement("div", {
+  style: {
+    minWidth: 74,
+    textAlign: "center"
+  }
+}, /*#__PURE__*/React.createElement("div", {
+  className: "mono",
+  style: {
+    fontSize: 9.5,
+    color: C.textMuted,
+    letterSpacing: ".08em",
+    textTransform: "uppercase"
+  }
+}, "Adjust"), /*#__PURE__*/React.createElement("div", {
+  style: {
+    fontFamily: "'Space Grotesk',sans-serif",
+    fontWeight: 700,
+    fontSize: 15,
+    color: spdAdj === 0 ? C.textMuted : C.orange
+  }
+}, (spdAdj > 0 ? "+" : "") + spdAdj.toFixed(1), " mph")), /*#__PURE__*/React.createElement("button", {
+  "aria-label": "Speed up",
+  onClick: () => bumpSpeed(0.1),
+  style: {
+    width: 42,
+    height: 42,
+    borderRadius: "50%",
+    background: C.card,
+    border: "1.5px solid " + C.border,
+    color: C.textPrimary,
+    fontSize: 22,
+    fontWeight: 700
+  }
+}, "+")), (hr != null || hrSupported) && /*#__PURE__*/React.createElement("div", {
+  style: {
+    marginTop: 12,
+    textAlign: "center"
+  }
+}, hr != null ? /*#__PURE__*/React.createElement("span", {
+  className: "mono",
+  style: {
+    fontSize: 13,
+    color: hrZone ? hrZone.c : C.textSecondary
+  }
+}, "♥ " + hr + " bpm · Z" + (hrZone ? hrZone.z : "") + " " + (hrZone ? hrZone.l : "")) : /*#__PURE__*/React.createElement("button", {
+  onClick: connectHR,
+  className: "mono",
+  style: {
+    fontSize: 12,
+    color: C.textMuted,
+    border: "1px solid " + C.border,
+    borderRadius: 10,
+    padding: "6px 12px",
+    background: C.card
+  }
+}, "♥ Connect heart rate"))), /*#__PURE__*/React.createElement("div", {
     className: "up-next",
     "aria-live": "polite"
   }, curIdx < intervals.length - 1 ? /*#__PURE__*/React.createElement(React.Fragment, null, "Up next · ", /*#__PURE__*/React.createElement("b", null, intervals[curIdx + 1].name), " · ", intervals[curIdx + 1].duration, " min") : /*#__PURE__*/React.createElement(React.Fragment, null, "Up next · ", /*#__PURE__*/React.createElement("b", null, "Finish"), " 🎉"))), iv.type === "run" && /*#__PURE__*/React.createElement("div", {
@@ -3662,7 +3828,7 @@ function TrainScreen({
     style: {
       background: ivColor(C, iv.type)
     }
-  }, iv.duration, "m"), /*#__PURE__*/React.createElement("div", {
+  }, iv.duration < 1 ? Math.round(iv.duration * 60) + "s" : iv.duration + "m"), /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1
     }
@@ -6381,6 +6547,11 @@ function App() {
   }, [checkins]);
   const completeOnboarding = answers => {
     const p = migrateProfile(answers);
+    // #6 place experienced runners further into the program (back-date the start)
+    const bias = p.runningAbility === "Comfortable runner"
+      ? ({ "30+ min": 4, "20–30 min": 3, "10–20 min": 2 }[p.runDuration] || 2)
+      : p.runningAbility === "I run a little" && (p.runDuration === "20–30 min" || p.runDuration === "30+ min") ? 1 : 0;
+    if (bias > 0 && p.startDate) p.startDate = shiftDay(p.startDate, -7 * bias);
     setProfile(p);
     LS.set(K.profile, p);
     if (p.currentWeight) {
