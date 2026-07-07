@@ -2721,12 +2721,26 @@ function TodayScreen({
       setSkipOpen(false);
       onStart({
         ...day,
-        intervals: day.intervals.map(iv => iv.type === "run" ? {
-          ...iv,
+        type: "walk",
+        intervals: [{
+          type: "warmup",
+          name: "Warm-up walk",
+          duration: 5,
+          speed: 3.0,
+          incline: 0
+        }, {
           type: "walk",
           name: "Brisk walk",
-          speed: 3.4
-        } : iv),
+          duration: Math.max(10, (day.totalMin || 30) - 10),
+          speed: 3.4,
+          incline: 1
+        }, {
+          type: "cool",
+          name: "Cool-down walk",
+          duration: 5,
+          speed: 2.8,
+          incline: 0
+        }],
         title: "Walk-Only Session",
         focus: "Easy walk"
       });
