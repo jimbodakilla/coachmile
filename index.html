@@ -3892,6 +3892,124 @@ function PlateModel({
     strokeWidth: "1.5"
   }));
 }
+function NutritionLibrary({
+  C,
+  profile
+}) {
+  const [open, setOpen] = useState(null);
+  const female = profile.gender === "Female";
+  const phase = cyclePhaseNow(profile);
+  const longSessions = (profile.timeAvailable || 30) >= 45;
+  const TOPICS = [{
+    icon: "⛽",
+    title: "Fuel your run (timing)",
+    body: ["Before: a small carb 60–90 min prior — banana, toast, or oats — tops off your energy. Skip heavy fat or fiber right before; they sit heavy.", "During: water covers most runs. Past about an hour, a few sips of something with a little sugar and salt keeps you going.", "After: within the hour, pair carbs + protein — yogurt and fruit, eggs and toast, or a shake — to refill and rebuild."]
+  }, {
+    icon: "🥚",
+    title: "Protein: your repair crew",
+    body: ["Aim for a palm-sized protein source at every meal. It rebuilds the muscle running breaks down and keeps you full for hours.", "Spread it across the day rather than one big hit — your body puts it to use better that way.", "Beginners almost always under-eat protein, not over. Eggs, Greek yogurt, beans, tofu, chicken, fish, and lentils all count."]
+  }, {
+    icon: "🍚",
+    title: "Carbs are fuel, not the enemy",
+    body: ["Carbs are your muscles' preferred fuel. Cut them too hard and every run starts to feel like a slog.", "Favor slow carbs — oats, rice, potatoes, whole grains, fruit — over sugary spikes that fade fast.", "Put your bigger carb servings around run days, when your legs will actually use them."]
+  }, {
+    icon: "💧",
+    title: "Hydration & electrolytes",
+    body: ["Thirst lags behind need. The simplest daily gauge: aim for pale-yellow urine, not dark.", longSessions ? "Your sessions run 45+ minutes, so on hot or sweaty days add electrolytes — a pinch of salt and a splash of juice, or an electrolyte tab." : "Plain water covers your current sessions. Only reach for electrolytes on unusually long or sweaty days.", "Caffeine is fine and can even sharpen a run — just not so late it steals the sleep where recovery actually happens."]
+  }, {
+    icon: "🩸",
+    title: female ? "Iron & the minerals women runners miss" : "Iron & the minerals runners miss",
+    body: ["Iron carries oxygen, and runners — especially women — often run low and feel it as unexplained fatigue. Pair iron foods (lentils, spinach, red meat) with vitamin C (peppers, citrus) to absorb far more.", ...(female && phase === "Menstrual" ? ["You're in your menstrual phase right now — a good week to lean extra into iron-rich meals."] : []), "Calcium and vitamin D protect the bones your treadmill work is busy strengthening — dairy, fortified plant milk, and a little sunlight.", "Magnesium — nuts, seeds, and leafy greens — supports muscle recovery and deeper sleep."]
+  }, {
+    icon: "🔁",
+    title: "Smart swaps that stick",
+    body: ["Trade one sugary drink a day for sparkling water and lime. It's the single highest-leverage change most people can make.", "Go whole where it's easy: brown rice sometimes, whole-grain bread, oats instead of sugary cereal.", "Make the fried side the exception, not the default — extra veg or a baked option most of the time.", "Keep every swap small enough that you'll still be doing it in six months."]
+  }, {
+    icon: "🍽️",
+    title: "Eat to your hunger, not the clock",
+    body: ["Before eating, rate your hunger 1–10. Aim to start around 3–4 and stop around 6–7 — satisfied, not stuffed.", "Fullness signals lag about ten minutes behind the fork. Slow down, and seconds often turn out to be unnecessary.", "This beats counting anything — and unlike a diet, it's a skill you keep for life."]
+  }];
+  return /*#__PURE__*/React.createElement("div", {
+    className: "card fu4 section-gap-sm"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "eyebrow",
+    style: {
+      marginBottom: 4
+    }
+  }, "From the nutritionists"), /*#__PURE__*/React.createElement("div", {
+    className: "h-sec",
+    style: {
+      fontSize: 16,
+      marginBottom: 2
+    }
+  }, "Nutrition, explained"), /*#__PURE__*/React.createElement("div", {
+    className: "muted",
+    style: {
+      fontSize: 12.5,
+      lineHeight: 1.5,
+      marginBottom: 10
+    }
+  }, "Evidence-based, no calorie counting. Tap a topic to open it."), TOPICS.map((t, i) => {
+    const isOpen = open === i;
+    return /*#__PURE__*/React.createElement("div", {
+      key: i,
+      style: {
+        borderTop: i ? "1px solid " + C.borderSoft : "none"
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        haptic();
+        setOpen(isOpen ? null : i);
+        if (!isOpen) track("nutri_open", {
+          t: t.title
+        });
+      },
+      "aria-expanded": isOpen,
+      style: {
+        width: "100%",
+        display: "flex",
+        alignItems: "center",
+        gap: 11,
+        padding: "13px 0",
+        textAlign: "left"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 20,
+        flexShrink: 0
+      }
+    }, t.icon), /*#__PURE__*/React.createElement("span", {
+      style: {
+        flex: 1,
+        fontSize: 14,
+        fontWeight: 600,
+        color: C.textPrimary
+      }
+    }, t.title), /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: C.textMuted,
+        fontSize: 18,
+        transform: isOpen ? "rotate(90deg)" : "none",
+        transition: "transform var(--dur-base) var(--ease)"
+      }
+    }, "›")), isOpen && /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: "0 0 14px 31px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 9,
+        animation: "fadeIn var(--dur-base) var(--ease)"
+      }
+    }, t.body.map((b, k) => /*#__PURE__*/React.createElement("div", {
+      key: k,
+      style: {
+        fontSize: 13,
+        color: C.textSecondary,
+        lineHeight: 1.55
+      }
+    }, b))));
+  }));
+}
 function FoodScreen({
   C,
   profile,
@@ -4091,7 +4209,10 @@ function FoodScreen({
       fontSize: 11.5,
       color: C.green
     }
-  }, "💲 ", recipe.budget)), /*#__PURE__*/React.createElement("div", {
+  }, "💲 ", recipe.budget)), /*#__PURE__*/React.createElement(NutritionLibrary, {
+    C: C,
+    profile: profile
+  }), /*#__PURE__*/React.createElement("div", {
     className: "card fu5 section-gap-sm"
   }, /*#__PURE__*/React.createElement("div", {
     className: "meal-tab"
