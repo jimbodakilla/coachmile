@@ -835,7 +835,7 @@ const CYCLES = {
       name: "Easy jog",
       duration: 1,
       speed: 4.5,
-      incline: 0
+      incline: 1.0
     }, {
       type: "walk",
       name: "Recovery walk",
@@ -864,7 +864,7 @@ const CYCLES = {
       name: "Run",
       duration: 3,
       speed: 5.2,
-      incline: 0.5
+      incline: 1.0
     }, {
       type: "walk",
       name: "Walk",
@@ -1363,6 +1363,33 @@ function uDistU(profile) {
 }
 function uWt(lbs, profile) {
   return isMetric(profile) ? Math.round(lbs * 0.453592) + " kg" : Math.round(lbs) + " lbs";
+}
+/* pace from treadmill mph — min per mile (or per km in metric) */
+function paceStr(mph, profile) {
+  if (!mph || mph <= 0) return "—";
+  const per = isMetric(profile) ? 60 / (mph * 1.60934) : 60 / mph;
+  let m = Math.floor(per), s = Math.round((per - m) * 60);
+  if (s === 60) { m += 1; s = 0; }
+  return m + ":" + String(s).padStart(2, "0") + "/" + (isMetric(profile) ? "km" : "mi");
+}
+function paceFromRun(minutes, miles, profile) {
+  if (!miles || miles <= 0 || !minutes) return null;
+  const per = isMetric(profile) ? minutes / (miles * 1.60934) : minutes / miles;
+  let m = Math.floor(per), s = Math.round((per - m) * 60);
+  if (s === 60) { m += 1; s = 0; }
+  return m + ":" + String(s).padStart(2, "0") + "/" + (isMetric(profile) ? "km" : "mi");
+}
+/* treadmill elevation gain (ft) from intervals: horizontal dist × grade */
+function elevGain(intervals) {
+  return Math.round((intervals || []).reduce((sum, iv) => {
+    const miles = (iv.speed || 0) * ((iv.duration || 0) / 60);
+    return sum + miles * 5280 * ((iv.incline || 0) / 100);
+  }, 0));
+}
+/* target running cadence (steps/min) — nudges up slightly with speed */
+function cadenceTarget(mph) {
+  if (!mph || mph < 3.5) return 0;
+  return Math.round(168 + Math.min(12, (mph - 4) * 1.6));
 }
 
 /* #3 real streak from check-in history (consecutive days, 1-day grace) */
@@ -2478,7 +2505,7 @@ function TodayScreen({
     }
   }, "◎ Form focus · ", formCueFor(computeWeek(profile), todayIdx)), /*#__PURE__*/React.createElement("div", {
     className: "mission-meta"
-  }, /*#__PURE__*/React.createElement("span", null, "⏱ ", /*#__PURE__*/React.createElement("b", null, day.totalMin, " min")), isRun && /*#__PURE__*/React.createElement("span", null, "◷ ", /*#__PURE__*/React.createElement("b", null, "guided"), " walk/run"), first && /*#__PURE__*/React.createElement("span", null, "▶ start at ", /*#__PURE__*/React.createElement("b", null, uSpeed(first.speed, profile)), " · ", (first.incline || 0).toFixed(1), "%")), isRun && goals.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("span", null, "⏱ ", /*#__PURE__*/React.createElement("b", null, day.totalMin, " min")), isRun && /*#__PURE__*/React.createElement("span", null, "◷ ", /*#__PURE__*/React.createElement("b", null, "guided"), " walk/run"), first && /*#__PURE__*/React.createElement("span", null, "▶ start at ", /*#__PURE__*/React.createElement("b", null, uSpeed(first.speed, profile)), " · ", (first.incline || 0).toFixed(1), "%", " · ", paceStr(first.speed, profile))), isRun && goals.length > 0 && /*#__PURE__*/React.createElement("div", {
     className: "goal-chips",
     style: {
       marginTop: 0,
@@ -3091,6 +3118,7 @@ function WorkoutMode({
           title: day.title,
           wtype: day.type,
           planKey: day.planKey,
+          elev: elevGain(intervals),
           logOnly: true
         });
         setPhase("stretch");
@@ -3110,6 +3138,7 @@ function WorkoutMode({
           title: day.title,
           wtype: day.type,
           planKey: day.planKey,
+          elev: elevGain(intervals),
           logOnly: true
         });
         setPhase("done");
@@ -3268,7 +3297,17 @@ function WorkoutMode({
     }
   }, uDistN(liveDist, profile)), /*#__PURE__*/React.createElement("div", {
     className: "tread-l"
-  }, isMetric(profile) ? "Km" : "Miles"))), /*#__PURE__*/React.createElement("div", {
+  }, isMetric(profile) ? "Km" : "Miles"))), iv.type === "run" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'IBM Plex Mono',monospace",
+      fontSize: 12,
+      color: C.textSecondary,
+      marginTop: 12,
+      textAlign: "center"
+    }
+  }, "Target pace ", /*#__PURE__*/React.createElement("b", {
+    style: { color: C.textPrimary }
+  }, paceStr(iv.speed, profile)), " · ", cadenceTarget(iv.speed), " spm"), /*#__PURE__*/React.createElement("div", {
     className: "up-next",
     "aria-live": "polite"
   }, curIdx < intervals.length - 1 ? /*#__PURE__*/React.createElement(React.Fragment, null, "Up next · ", /*#__PURE__*/React.createElement("b", null, intervals[curIdx + 1].name), " · ", intervals[curIdx + 1].duration, " min") : /*#__PURE__*/React.createElement(React.Fragment, null, "Up next · ", /*#__PURE__*/React.createElement("b", null, "Finish"), " 🎉"))), iv.type === "run" && /*#__PURE__*/React.createElement("div", {
@@ -3631,7 +3670,7 @@ function TrainScreen({
     className: "iv-name"
   }, iv.name), /*#__PURE__*/React.createElement("div", {
     className: "iv-sub"
-  }, uSpeed(iv.speed, profile), " · ", (iv.incline || 0).toFixed(1), "% incline"))))), day.type === "rest" && /*#__PURE__*/React.createElement("div", {
+  }, uSpeed(iv.speed, profile), " · ", (iv.incline || 0).toFixed(1), "% incline", iv.type === "run" ? " · " + paceStr(iv.speed, profile) : ""))))), day.type === "rest" && /*#__PURE__*/React.createElement("div", {
     style: {
       padding: "14px 0 4px",
       color: C.textSecondary,
@@ -4616,6 +4655,10 @@ function NutritionLibrary({
     title: "Water and electrolytes",
     body: ["You're usually a step behind your thirst. Easiest check going: your pee should be pale, not dark.", longSessions ? "Your runs are 45 minutes or more, so on hot or sweaty days it's worth adding electrolytes. A pinch of salt and a splash of juice does the job, or grab an electrolyte tab." : "Plain water covers your runs right now. You only really need electrolytes on the long or sweaty ones.", "Coffee's fine, and it can even help your run. Just don't have it so late that it wrecks your sleep, since that's when you actually recover."]
   }, {
+    icon: "🥯",
+    title: "Fueling a longer run",
+    body: ["Under about an hour, you don't need to eat mid-run. Water and a normal meal beforehand cover it.", "Going longer than an hour? Take in a bit of quick carb every 30 to 45 minutes. A few dates, half a banana, or a gel all work.", "The day before a long one, lean into carbs at your meals. It tops off the tank so you're not running on empty.", "Whatever you plan to eat on a big day, try it on a normal run first. A long run is a bad time to find out something upsets your stomach."]
+  }, {
     icon: "🩸",
     title: female ? "Iron and the minerals women runners miss" : "Iron and the minerals runners miss",
     body: ["Iron helps carry oxygen around your body, and runners run low on it more than most, women especially. It shows up as being tired for no clear reason. Eat iron foods like lentils, spinach or red meat alongside something high in vitamin C, like peppers or citrus, and you'll absorb a lot more of it.", ...(female && phase === "Menstrual" ? ["You're on your period this week, so it's a good time to lean into iron-rich meals."] : []), "Calcium and vitamin D keep your bones strong while you're running on them. Dairy, fortified plant milk, and a bit of sun all help.", "Magnesium helps you recover and sleep better. You'll find it in nuts, seeds and leafy greens."]
@@ -4949,6 +4992,122 @@ function FoodScreen({
 /* ============================================================
    PROGRESS SCREEN
    ============================================================ */
+function RunnerStats({
+  C,
+  profile,
+  checkins
+}) {
+  const runs = (checkins || []).filter(c => c.miles > 0);
+  if (runs.length === 0) return null;
+  const metric = isMetric(profile);
+  let fastest = null;
+  runs.forEach(c => {
+    if (c.miles >= 0.5 && c.minutes) {
+      const p = c.minutes / c.miles;
+      if (fastest == null || p < fastest.p) fastest = {
+        p,
+        m: c.minutes,
+        mi: c.miles
+      };
+    }
+  });
+  const longest = runs.reduce((mx, c) => Math.max(mx, c.miles || 0), 0);
+  let bestWeek = 0;
+  runs.forEach(c => {
+    const start = shiftDay(c.date, -6);
+    const s = runs.filter(x => x.date >= start && x.date <= c.date).reduce((a, x) => a + (x.miles || 0), 0);
+    if (s > bestWeek) bestWeek = s;
+  });
+  const totalElev = (checkins || []).reduce((a, c) => a + (c.elev || 0), 0);
+  const today = todayStr();
+  const weeks = [];
+  for (let w = 5; w >= 0; w--) {
+    const end = shiftDay(today, -7 * w);
+    const start = shiftDay(end, -6);
+    const mi = runs.filter(x => x.date >= start && x.date <= end).reduce((a, x) => a + (x.miles || 0), 0);
+    weeks.push(+mi.toFixed(1));
+  }
+  const maxW = Math.max(1, ...weeks);
+  const climb = metric ? Math.round(totalElev * 0.3048) + " m" : totalElev + " ft";
+  const PR = [["Fastest pace", fastest ? paceFromRun(fastest.m, fastest.mi, profile) : "—"], ["Longest run", longest ? uDistN(longest, profile) + " " + uDistU(profile) : "—"], ["Best week", bestWeek ? uDistN(bestWeek, profile) + " " + uDistU(profile) : "—"], ["Total climb", climb]];
+  return /*#__PURE__*/React.createElement("div", {
+    className: "card fu2 section-gap-sm"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "eyebrow",
+    style: {
+      marginBottom: 10
+    }
+  }, "Your running numbers"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
+      gap: 10,
+      marginBottom: 16
+    }
+  }, PR.map(([l, v]) => /*#__PURE__*/React.createElement("div", {
+    key: l,
+    style: {
+      background: C.card,
+      border: "1px solid " + C.border,
+      borderRadius: 12,
+      padding: "11px 12px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Space Grotesk',sans-serif",
+      fontWeight: 700,
+      fontSize: 18,
+      color: C.orange
+    }
+  }, v), /*#__PURE__*/React.createElement("div", {
+    className: "mono",
+    style: {
+      fontSize: 9.5,
+      color: C.textMuted,
+      letterSpacing: ".05em",
+      textTransform: "uppercase",
+      marginTop: 2
+    }
+  }, l)))), /*#__PURE__*/React.createElement("div", {
+    className: "eyebrow",
+    style: {
+      marginBottom: 8
+    }
+  }, "Weekly ", metric ? "distance" : "mileage", " · last 6 weeks"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "flex-end",
+      gap: 7,
+      height: 70
+    },
+    role: "img",
+    "aria-label": "Weekly " + (metric ? "km" : "miles") + " over the last 6 weeks: " + weeks.map(w => metric ? +(w * 1.60934).toFixed(1) : w).join(", ")
+  }, weeks.map((w, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    "aria-hidden": "true",
+    style: {
+      flex: 1,
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      gap: 5,
+      justifyContent: "flex-end"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: "100%",
+      height: Math.max(4, w / maxW * 54) + "px",
+      background: i === 5 ? C.orange : C.orange + "66",
+      borderRadius: "5px 5px 0 0"
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "mono",
+    style: {
+      fontSize: 9,
+      color: C.textMuted
+    }
+  }, metric ? +(w * 1.60934).toFixed(1) : w)))));
+}
 function ProgressScreen({
   C,
   profile,
@@ -5041,7 +5200,11 @@ function ProgressScreen({
     }, mn), /*#__PURE__*/React.createElement("div", {
       className: "l"
     }, "Minutes"))));
-  })(), /*#__PURE__*/React.createElement("div", {
+  })(), /*#__PURE__*/React.createElement(RunnerStats, {
+    C: C,
+    profile: profile,
+    checkins: checkins
+  }), /*#__PURE__*/React.createElement("div", {
     className: "card fu3 section-gap-sm"
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -5067,7 +5230,7 @@ function ProgressScreen({
       fontSize: 13,
       padding: "6px 0"
     }
-  }, "Finish your first session and it lands here — every run, kept.") : [...checkins].reverse().slice(0, 12).map((c, i) => /*#__PURE__*/React.createElement("div", {
+  }, "Finish your first session and it shows up here. Every run, kept.") : [...checkins].reverse().slice(0, 12).map((c, i) => /*#__PURE__*/React.createElement("div", {
     className: "hist-item",
     key: i
   }, /*#__PURE__*/React.createElement("div", {
@@ -5082,7 +5245,7 @@ function ProgressScreen({
     className: "hist-t"
   }, c.title || "Run"), /*#__PURE__*/React.createElement("div", {
     className: "hist-meta"
-  }, c.miles != null ? uDistN(c.miles, profile) + " " + uDistU(profile) + " · " : "", c.minutes || 0, " min", c.cals && !profile.bodyNeutral ? " · " + c.cals + " kcal" : "")), /*#__PURE__*/React.createElement("div", {
+  }, c.miles != null ? uDistN(c.miles, profile) + " " + uDistU(profile) + " · " : "", c.minutes || 0, " min", c.miles && c.minutes ? " · " + paceFromRun(c.minutes, c.miles, profile) : "", c.cals && !profile.bodyNeutral ? " · " + c.cals + " kcal" : "")), /*#__PURE__*/React.createElement("div", {
     className: "hist-mood",
     title: "Felt " + (c.mood || "")
   }, c.mood || ""), /*#__PURE__*/React.createElement("div", {
@@ -6269,6 +6432,7 @@ function App() {
         minutes: res.minutes,
         cals: res.cals,
         miles: res.miles,
+        elev: res.elev,
         title: res.title,
         wtype: res.wtype,
         planKey: res.planKey
