@@ -413,6 +413,17 @@ input{font-family:inherit;}
 .fu6{animation:fadeUp .5s .30s ease both;}
 .spin{animation:spinSlow 1.1s linear infinite;}
 ::-webkit-scrollbar{width:0;height:0;}
+.wk-voice{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15px;text-align:center;margin:8px 0 2px;letter-spacing:-.01em;}
+.wk-flash{position:fixed;inset:0;z-index:80;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#fff;text-align:center;padding:24px;}
+.wk-flash-word{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:clamp(52px,16vw,80px);letter-spacing:.02em;line-height:1;}
+.wk-flash-sub{font-family:'Inter',sans-serif;font-size:18px;opacity:.92;}
+.wk-count{position:fixed;inset:0;z-index:70;display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:clamp(96px,30vw,150px);pointer-events:none;}
+@media (prefers-reduced-motion:no-preference){
+.wk-flash{animation:wkFlashIn .22s ease both;}
+@keyframes wkFlashIn{from{opacity:0;transform:scale(1.05);}to{opacity:1;transform:none;}}
+.wk-count{animation:wkCountPop .85s ease both;}
+@keyframes wkCountPop{from{opacity:.15;transform:scale(1.5);}to{opacity:1;transform:scale(1);}}
+}
 `;
 
 /* ============================================================
@@ -3593,6 +3604,115 @@ function BodyweightMode({
     onClick: nextExercise
   }, doneCount + 1 >= total ? "Finish circuit" : "Done, next move →")));
 }
+/* action word for the big transition takeover */
+/* action word for the big transition takeover */
+/* action word for the big transition takeover */
+function actionWord(iv) {
+  if (!iv) return "GO";
+  return iv.type === "run" ? "RUN" : iv.type === "walk" ? "WALK" : iv.type === "warmup" ? "WARM UP" : iv.type === "cool" ? "COOL DOWN" : "GO";
+}
+/* strong, unmissable buzz on an interval change (works with audio off) */
+function bigBuzz() {
+  try {
+    if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate([220, 90, 220, 90, 260]);
+  } catch (e) {}
+}
+/* module-level RPE table so the same array reference is returned per interval type
+   (keeps EffortCue's memo effective — a fresh literal each render would defeat it) */
+const RPE_TABLE = {
+  warmup: ["3–4", "Easy. You can chat freely."],
+  walk: ["3–4", "Recovery pace. Catch your breath."],
+  run: ["6–7", "Working. Short sentences only."],
+  cool: ["2–3", "Wind down. Let the heart settle."]
+};
+const RPE_DEFAULT = ["4", "Steady."];
+
+/* memoized effort cue — pure, only re-renders when the interval type changes, not on every tick */
+const EffortCue = React.memo(function EffortCue({
+  rpe
+}) {
+  return React.createElement("div", {
+    className: "wk-rpe"
+  }, React.createElement("b", null, "RPE ", rpe[0]), " · ", rpe[1]);
+});
+
+/* memoized detail panel (target pace, cadence, heart rate) — collapses behind a tap; per-tick stable */
+const DetailsPanel = React.memo(function DetailsPanel({
+  C,
+  profile,
+  iv,
+  effSpeed,
+  cadenceOn,
+  onToggleCadence,
+  hr,
+  hrZone,
+  hrSupported,
+  onConnectHR
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 14,
+      borderTop: "1px solid " + C.border,
+      paddingTop: 14,
+      display: "flex",
+      flexDirection: "column",
+      gap: 12,
+      alignItems: "center"
+    }
+  }, iv.type === "run" && /*#__PURE__*/React.createElement("div", {
+    className: "mono",
+    style: {
+      fontSize: 12,
+      color: C.textSecondary,
+      textAlign: "center"
+    }
+  }, "Target pace ", /*#__PURE__*/React.createElement("b", {
+    style: {
+      color: C.textPrimary
+    }
+  }, paceStr(effSpeed, profile)), " · ", cadenceTarget(effSpeed), " spm"), /*#__PURE__*/React.createElement("button", {
+    "aria-label": "Toggle cadence metronome 175 steps per minute",
+    "aria-pressed": cadenceOn,
+    onClick: onToggleCadence,
+    style: {
+      fontFamily: "'IBM Plex Mono',monospace",
+      fontSize: 12,
+      padding: "9px 14px",
+      borderRadius: 20,
+      border: "1px solid " + (cadenceOn ? C.orange : C.border),
+      color: cadenceOn ? C.orange : C.textMuted,
+      background: cadenceOn ? C.orange + "12" : "transparent"
+    }
+  }, "♩ Cadence ", cadenceOn ? "175 spm" : "off"), (hr != null || hrSupported) && (hr != null ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "mono",
+    style: {
+      fontSize: 13,
+      color: hrZone ? hrZone.c : C.textSecondary
+    }
+  }, "♥ ", hr, " bpm · Z", hrZone ? hrZone.z : "", " ", hrZone ? hrZone.l : ""), hrZone && hrZone.z === 5 && /*#__PURE__*/React.createElement("div", {
+    className: "mono",
+    style: {
+      fontSize: 12,
+      color: C.orange,
+      marginTop: 6
+    }
+  }, "Sitting near your max. Ease back a little.")) : /*#__PURE__*/React.createElement("button", {
+    onClick: onConnectHR,
+    className: "mono",
+    style: {
+      fontSize: 12,
+      color: C.textMuted,
+      border: "1px solid " + C.border,
+      borderRadius: 10,
+      padding: "7px 13px",
+      background: C.card
+    }
+  }, "♥ Connect heart rate")));
+});
 function WorkoutMode({
   C,
   day,
@@ -3629,17 +3749,33 @@ function WorkoutMode({
   const cueCtxRef = useRef(null);
   const metroRef = useRef(null);
   const [cadenceOn, setCadenceOn] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
   // #7 mid-run manual speed adjust (session-wide offset, mph)
   const [spdAdj, setSpdAdj] = useState(0);
   const spdAdjRef = useRef(0);
-  const bumpSpeed = dv => setSpdAdj(v => { const nv = +Math.max(-2, Math.min(2, v + dv)).toFixed(1); spdAdjRef.current = nv; haptic(); return nv; });
+  // effort guardrail — warn once when crossing a big-jump threshold scaled to ability
+  const beginner = profile.runningAbility === "Can't run yet" || profile.runningAbility === "I run a little";
+  const jumpCap = beginner ? 0.6 : 1.2;
+  const bumpSpeed = dv => setSpdAdj(v => {
+    const nv = +Math.max(-2, Math.min(2, v + dv)).toFixed(1);
+    if (dv > 0 && nv >= jumpCap && v < jumpCap) {
+      if (!confirm("You're picking the pace up a fair bit. Only go faster if it still feels controlled. Keep going?")) return v;
+    }
+    spdAdjRef.current = nv;
+    haptic();
+    return nv;
+  });
   // #9 heart rate via Web Bluetooth (best-effort; needs a BLE strap + https)
   const [hr, setHr] = useState(null);
   const hrDevRef = useRef(null);
   const hrSupported = typeof navigator !== "undefined" && navigator.bluetooth;
-  const connectHR = async () => {
+  const connectHR = useCallback(async () => {
     try {
-      const dev = await navigator.bluetooth.requestDevice({ filters: [{ services: ["heart_rate"] }] });
+      const dev = await navigator.bluetooth.requestDevice({
+        filters: [{
+          services: ["heart_rate"]
+        }]
+      });
       hrDevRef.current = dev;
       const server = await dev.gatt.connect();
       const svc = await server.getPrimaryService("heart_rate");
@@ -3651,11 +3787,46 @@ function WorkoutMode({
         setHr(flags & 1 ? v.getUint16(1, true) : v.getUint8(1));
       });
     } catch (e) {}
-  };
-  useEffect(() => () => { try { if (hrDevRef.current && hrDevRef.current.gatt.connected) hrDevRef.current.gatt.disconnect(); } catch (e) {} }, []);
+  }, []);
+  useEffect(() => () => {
+    try {
+      if (hrDevRef.current && hrDevRef.current.gatt.connected) hrDevRef.current.gatt.disconnect();
+    } catch (e) {}
+  }, []);
+  // close the shared AudioContext on unmount — WorkoutMode remounts each session, and
+  // browsers cap concurrent contexts, so leaking one per workout eventually kills cue audio
+  useEffect(() => () => {
+    try {
+      if (cueCtxRef.current) {
+        cueCtxRef.current.close();
+        cueCtxRef.current = null;
+      }
+    } catch (e) {}
+  }, []);
   const hrZone = hr == null ? null : (() => {
-    const max = 220 - (profile.age || 35), pct = hr / max;
-    return pct < 0.6 ? { z: 1, l: "Easy", c: C.blue } : pct < 0.7 ? { z: 2, l: "Aerobic", c: C.green } : pct < 0.8 ? { z: 3, l: "Tempo", c: C.yellow } : pct < 0.9 ? { z: 4, l: "Threshold", c: C.orange } : { z: 5, l: "Max", c: C.red };
+    const max = 220 - (profile.age || 35),
+      pct = hr / max;
+    return pct < 0.6 ? {
+      z: 1,
+      l: "Easy",
+      c: C.blue
+    } : pct < 0.7 ? {
+      z: 2,
+      l: "Aerobic",
+      c: C.green
+    } : pct < 0.8 ? {
+      z: 3,
+      l: "Tempo",
+      c: C.yellow
+    } : pct < 0.9 ? {
+      z: 4,
+      l: "Threshold",
+      c: C.orange
+    } : {
+      z: 5,
+      l: "Max",
+      c: C.red
+    };
   })();
   // #15 cadence metronome — soft tick at 175 spm during run intervals
   const tickClick = () => {
@@ -3794,26 +3965,62 @@ function WorkoutMode({
       } catch (e) {}
     };
   }, [phase]);
+
+  // #1 big visual + haptic transition takeover on every interval change (independent of audio)
+  const [flash, setFlash] = useState(null);
+  const flashTimer = useRef(null);
+  useEffect(() => {
+    if (phase !== "run") return;
+    if (curIdx === startIdx) return; // no flash on the first/resumed interval
+    const ivt = intervals[curIdx];
+    bigBuzz();
+    setFlash({
+      word: actionWord(ivt),
+      sub: ivt.name,
+      color: ivColor(C, ivt.type)
+    });
+    clearTimeout(flashTimer.current);
+    flashTimer.current = setTimeout(() => setFlash(null), 1900);
+    return () => clearTimeout(flashTimer.current);
+  }, [curIdx, phase]);
+
+  // pause hardening — a "still there?" nudge after a long pause
+  const [pausedLong, setPausedLong] = useState(false);
+  const pauseNudgeRef = useRef(null);
+  useEffect(() => {
+    clearTimeout(pauseNudgeRef.current);
+    if (paused) {
+      pauseNudgeRef.current = setTimeout(() => setPausedLong(true), 90000);
+    } else setPausedLong(false);
+    return () => clearTimeout(pauseNudgeRef.current);
+  }, [paused]);
   const iv = intervals[curIdx];
   const phaseColor = ivColor(C, iv.type);
   const effSpeed = Math.max(0, (iv.speed || 0) + spdAdj);
   const mm = String(Math.floor(displaySecs / 60)).padStart(2, "0");
   const ss = String(Math.max(0, displaySecs % 60)).padStart(2, "0");
-  const rpe = {
-    warmup: ["3–4", "Easy. You can chat freely."],
-    walk: ["3–4", "Recovery pace. Catch your breath."],
-    run: ["6–7", "Working. Short sentences only."],
-    cool: ["2–3", "Wind down. Let the heart settle."]
-  }[iv.type] || ["4", "Steady."];
+  const rpe = RPE_TABLE[iv.type] || RPE_DEFAULT;
   const totalSecsPlan = intervals.reduce((s, i) => s + i.duration * 60, 0);
   const showBreathe = iv.type === "run" || iv.breath;
   const liveDist = distRef.current;
+  const uUnit = isMetric(profile) ? "km" : "mi";
+
+  // #5 a little in-run voice — one line at halfway, one on the final interval
+  const name = profile.name || "you";
+  const isFinalIv = curIdx === intervals.length - 1;
+  const pastHalf = totalSecsPlan > 0 && elapsed >= totalSecsPlan / 2;
+  const voiceLine = isFinalIv ? `Last stretch, ${name}. Ease it home.` : pastHalf && (iv.type === "run" || iv.type === "walk") ? "Past halfway. This is the part that counts." : "";
   const [ci, setCi] = useState({
     energy: "",
     soreness: "",
     mood: ""
   });
   const ciDone = ci.energy && ci.soreness && ci.mood;
+  // #3 honest distance — let the user confirm/correct the logged distance
+  const [actualMiles, setActualMiles] = useState(null);
+  const estMiles = +distRef.current.toFixed(2);
+  const finalMiles = actualMiles != null ? +actualMiles.toFixed(2) : estMiles;
+  const nudgeDist = dv => setActualMiles(v => Math.max(0, +((v != null ? v : estMiles) + dv).toFixed(2)));
   const STRETCHES = [{
     name: "Quad Stretch",
     em: "🦵",
@@ -3843,6 +4050,7 @@ function WorkoutMode({
   const [stIdx, setStIdx] = useState(0);
   const [stSecs, setStSecs] = useState(STRETCHES[0].secs);
   const stRef = useRef(null);
+  const stAdvRef = useRef(null);
   useEffect(() => {
     if (phase !== "stretch") return;
     setStSecs(STRETCHES[stIdx].secs);
@@ -3850,13 +4058,16 @@ function WorkoutMode({
       setStSecs(s => {
         if (s <= 1) {
           clearInterval(stRef.current);
-          setTimeout(() => advanceStretch(), 300);
+          stAdvRef.current = setTimeout(() => advanceStretch(), 300);
           return 0;
         }
         return s - 1;
       });
     }, 1000);
-    return () => clearInterval(stRef.current);
+    return () => {
+      clearInterval(stRef.current);
+      clearTimeout(stAdvRef.current);
+    };
   }, [phase, stIdx]);
   const advanceStretch = () => {
     setStIdx(i => {
@@ -3868,6 +4079,27 @@ function WorkoutMode({
     });
   };
   const calcCals = () => Math.round(elapsedRef.current / 60 * ((profile.currentWeight || 170) * 0.00095) * 11);
+  const finishPayload = () => ({
+    checkin: {
+      ...ci,
+      date: todayStr()
+    },
+    cals: calcCals(),
+    minutes: Math.round(elapsedRef.current / 60),
+    miles: finalMiles,
+    intervals: intervals.length,
+    title: day.title,
+    wtype: day.type,
+    planKey: day.planKey,
+    elev: elevGain(intervals),
+    logOnly: true
+  });
+
+  // stable handlers for the memoized detail panel
+  const onToggleCadence = useCallback(() => {
+    haptic();
+    setCadenceOn(v => !v);
+  }, []);
   if (phase === "checkin") {
     const rows = [["energy", "Energy", ["High", "Okay", "Low"]], ["soreness", "Soreness", ["Fresh", "Tight", "Sore"]], ["mood", "Mood", ["😀", "🙂", "😐"]]];
     return /*#__PURE__*/React.createElement("div", {
@@ -3903,7 +4135,81 @@ function WorkoutMode({
         fontSize: 14,
         marginBottom: 24
       }
-    }, "This teaches CoachMile how to adapt your next session."), rows.map(([key, lab, opts]) => /*#__PURE__*/React.createElement("div", {
+    }, "This teaches CoachMile how to adapt your next session."), /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 24,
+        padding: "16px",
+        borderRadius: 14,
+        background: C.card,
+        border: "1px solid " + C.border
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "eyebrow",
+      style: {
+        marginBottom: 10
+      }
+    }, "Distance you actually ran"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 16
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      "aria-label": "Less distance",
+      onClick: () => nudgeDist(-0.05),
+      style: {
+        width: 44,
+        height: 44,
+        borderRadius: "50%",
+        background: C.bg,
+        border: "1.5px solid " + C.border,
+        color: C.textPrimary,
+        fontSize: 22,
+        fontWeight: 700
+      }
+    }, "−"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        minWidth: 96,
+        textAlign: "center"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: "'Space Grotesk',sans-serif",
+        fontWeight: 700,
+        fontSize: 26,
+        color: C.textPrimary
+      }
+    }, uDistN(finalMiles, profile)), /*#__PURE__*/React.createElement("div", {
+      className: "mono",
+      style: {
+        fontSize: 10,
+        color: C.textMuted,
+        textTransform: "uppercase",
+        letterSpacing: ".08em"
+      }
+    }, uUnit)), /*#__PURE__*/React.createElement("button", {
+      "aria-label": "More distance",
+      onClick: () => nudgeDist(0.05),
+      style: {
+        width: 44,
+        height: 44,
+        borderRadius: "50%",
+        background: C.bg,
+        border: "1.5px solid " + C.border,
+        color: C.textPrimary,
+        fontSize: 22,
+        fontWeight: 700
+      }
+    }, "+")), /*#__PURE__*/React.createElement("div", {
+      className: "muted",
+      style: {
+        fontSize: 12,
+        marginTop: 10,
+        textAlign: "center",
+        lineHeight: 1.5
+      }
+    }, "We estimated ", uDistN(estMiles, profile), " ", uUnit, " from your plan. Nudge it if your belt read different.")), rows.map(([key, lab, opts]) => /*#__PURE__*/React.createElement("div", {
       key: key,
       style: {
         marginBottom: 22
@@ -3935,41 +4241,13 @@ function WorkoutMode({
       },
       disabled: !ciDone,
       onClick: () => {
-        onFinish({
-          checkin: {
-            ...ci,
-            date: todayStr()
-          },
-          cals: calcCals(),
-          minutes: Math.round(elapsedRef.current / 60),
-          miles: +distRef.current.toFixed(2),
-          intervals: intervals.length,
-          title: day.title,
-          wtype: day.type,
-          planKey: day.planKey,
-          elev: elevGain(intervals),
-          logOnly: true
-        });
+        onFinish(finishPayload());
         setPhase("stretch");
       }
     }, "Continue to stretch →"), /*#__PURE__*/React.createElement("button", {
       className: "btn-ghost",
       onClick: () => {
-        onFinish({
-          checkin: {
-            ...ci,
-            date: todayStr()
-          },
-          cals: calcCals(),
-          minutes: Math.round(elapsedRef.current / 60),
-          miles: +distRef.current.toFixed(2),
-          intervals: intervals.length,
-          title: day.title,
-          wtype: day.type,
-          planKey: day.planKey,
-          elev: elevGain(intervals),
-          logOnly: true
-        });
+        onFinish(finishPayload());
         setPhase("done");
       }
     }, "Skip stretch")));
@@ -4030,7 +4308,7 @@ function WorkoutMode({
       sessions: sessions,
       minutes: Math.round(elapsedRef.current / 60),
       cals: calcCals(),
-      miles: distRef.current,
+      miles: finalMiles,
       intervals: intervals.length,
       onDone: () => onFinish({
         complete: true
@@ -4038,9 +4316,27 @@ function WorkoutMode({
     });
   }
   const progressPct = Math.min(100, Math.round(elapsed / totalSecsPlan * 100));
+  const counting = !paused && !flash && displaySecs <= 3 && displaySecs > 0 && curIdx < intervals.length - 1;
   return /*#__PURE__*/React.createElement("div", {
     className: "wk-full"
+  }, flash && /*#__PURE__*/React.createElement("div", {
+    className: "wk-flash",
+    style: {
+      background: flash.color
+    },
+    role: "alert",
+    "aria-live": "assertive"
   }, /*#__PURE__*/React.createElement("div", {
+    className: "wk-flash-word"
+  }, flash.word), /*#__PURE__*/React.createElement("div", {
+    className: "wk-flash-sub"
+  }, flash.sub)), counting && /*#__PURE__*/React.createElement("div", {
+    className: "wk-count",
+    style: {
+      color: phaseColor
+    },
+    "aria-hidden": "true"
+  }, displaySecs), /*#__PURE__*/React.createElement("div", {
     className: "wk-head"
   }, /*#__PURE__*/React.createElement("div", {
     className: "wk-phase-lab",
@@ -4048,29 +4344,7 @@ function WorkoutMode({
       color: phaseColor
     },
     "aria-live": "polite"
-  }, "● ", iv.type.toUpperCase()), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 8,
-      alignItems: "center"
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    "aria-label": "Toggle cadence metronome 175 steps per minute",
-    "aria-pressed": cadenceOn,
-    onClick: () => {
-      haptic();
-      setCadenceOn(v => !v);
-    },
-    style: {
-      fontFamily: "'IBM Plex Mono',monospace",
-      fontSize: 11,
-      padding: "7px 11px",
-      borderRadius: 20,
-      border: "1px solid " + (cadenceOn ? C.orange : C.border),
-      color: cadenceOn ? C.orange : C.textMuted,
-      background: cadenceOn ? C.orange + "12" : "transparent"
-    }
-  }, "♩ ", cadenceOn ? "175" : "off"), /*#__PURE__*/React.createElement("button", {
+  }, "● ", iv.type.toUpperCase()), /*#__PURE__*/React.createElement("button", {
     className: "wk-x",
     "aria-label": "Exit workout",
     onClick: () => {
@@ -4080,7 +4354,7 @@ function WorkoutMode({
         onExit();
       }
     }
-  }, "✕"))), /*#__PURE__*/React.createElement("div", {
+  }, "✕")), /*#__PURE__*/React.createElement("div", {
     className: "wk-body"
   }, /*#__PURE__*/React.createElement("div", {
     className: "wk-cur",
@@ -4101,9 +4375,15 @@ function WorkoutMode({
     }
   }), /*#__PURE__*/React.createElement("div", {
     className: "breathe-lab"
-  }, "BREATHE WITH THE CIRCLE · IN … OUT")), /*#__PURE__*/React.createElement("div", {
-    className: "wk-rpe"
-  }, /*#__PURE__*/React.createElement("b", null, "RPE ", rpe[0]), " · ", rpe[1]), /*#__PURE__*/React.createElement("div", {
+  }, "BREATHE WITH THE CIRCLE · IN … OUT")), voiceLine && /*#__PURE__*/React.createElement("div", {
+    className: "wk-voice",
+    style: {
+      color: phaseColor
+    },
+    role: "status"
+  }, voiceLine), /*#__PURE__*/React.createElement(EffortCue, {
+    rpe: rpe
+  }), /*#__PURE__*/React.createElement("div", {
     className: "tread-row"
   }, /*#__PURE__*/React.createElement("div", {
     className: "tread-cell"
@@ -4126,99 +4406,116 @@ function WorkoutMode({
     }
   }, uDistN(liveDist, profile)), /*#__PURE__*/React.createElement("div", {
     className: "tread-l"
-  }, isMetric(profile) ? "Km" : "Miles"))), iv.type === "run" && /*#__PURE__*/React.createElement("div", {
+  }, isMetric(profile) ? "Km" : "Miles"))), /*#__PURE__*/React.createElement("div", {
+    className: "mono",
     style: {
-      fontFamily: "'IBM Plex Mono',monospace",
-      fontSize: 12,
-      color: C.textSecondary,
+      fontSize: 11,
+      color: C.textMuted,
+      textAlign: "center",
       marginTop: 12,
+      letterSpacing: ".04em"
+    }
+  }, "SET YOUR BELT TO THIS · THE − / + JUST KEEPS YOUR NUMBERS HONEST"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 18,
+      marginTop: 8
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    "aria-label": "Slow down",
+    onClick: () => bumpSpeed(-0.1),
+    style: {
+      width: 54,
+      height: 54,
+      borderRadius: "50%",
+      background: C.card,
+      border: "1.5px solid " + C.border,
+      color: C.textPrimary,
+      fontSize: 26,
+      fontWeight: 700
+    }
+  }, "−"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      minWidth: 88,
       textAlign: "center"
     }
-  }, "Target pace ", /*#__PURE__*/React.createElement("b", {
-    style: { color: C.textPrimary }
-  }, paceStr(effSpeed, profile)), " · ", cadenceTarget(effSpeed), " spm"), /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
-  style: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 14,
-    marginTop: 14
-  }
-}, /*#__PURE__*/React.createElement("button", {
-  "aria-label": "Slow down",
-  onClick: () => bumpSpeed(-0.1),
-  style: {
-    width: 42,
-    height: 42,
-    borderRadius: "50%",
-    background: C.card,
-    border: "1.5px solid " + C.border,
-    color: C.textPrimary,
-    fontSize: 22,
-    fontWeight: 700
-  }
-}, "−"), /*#__PURE__*/React.createElement("div", {
-  style: {
-    minWidth: 74,
-    textAlign: "center"
-  }
-}, /*#__PURE__*/React.createElement("div", {
-  className: "mono",
-  style: {
-    fontSize: 9.5,
-    color: C.textMuted,
-    letterSpacing: ".08em",
-    textTransform: "uppercase"
-  }
-}, "Adjust"), /*#__PURE__*/React.createElement("div", {
-  style: {
-    fontFamily: "'Space Grotesk',sans-serif",
-    fontWeight: 700,
-    fontSize: 15,
-    color: spdAdj === 0 ? C.textMuted : C.orange
-  }
-}, (spdAdj > 0 ? "+" : "") + spdAdj.toFixed(1), " mph")), /*#__PURE__*/React.createElement("button", {
-  "aria-label": "Speed up",
-  onClick: () => bumpSpeed(0.1),
-  style: {
-    width: 42,
-    height: 42,
-    borderRadius: "50%",
-    background: C.card,
-    border: "1.5px solid " + C.border,
-    color: C.textPrimary,
-    fontSize: 22,
-    fontWeight: 700
-  }
-}, "+")), (hr != null || hrSupported) && /*#__PURE__*/React.createElement("div", {
-  style: {
-    marginTop: 12,
-    textAlign: "center"
-  }
-}, hr != null ? /*#__PURE__*/React.createElement("span", {
-  className: "mono",
-  style: {
-    fontSize: 13,
-    color: hrZone ? hrZone.c : C.textSecondary
-  }
-}, "♥ " + hr + " bpm · Z" + (hrZone ? hrZone.z : "") + " " + (hrZone ? hrZone.l : "")) : /*#__PURE__*/React.createElement("button", {
-  onClick: connectHR,
-  className: "mono",
-  style: {
-    fontSize: 12,
-    color: C.textMuted,
-    border: "1px solid " + C.border,
-    borderRadius: 10,
-    padding: "6px 12px",
-    background: C.card
-  }
-}, "♥ Connect heart rate"))), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "mono",
+    style: {
+      fontSize: 9.5,
+      color: C.textMuted,
+      letterSpacing: ".08em",
+      textTransform: "uppercase"
+    }
+  }, "Match your belt"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Space Grotesk',sans-serif",
+      fontWeight: 700,
+      fontSize: 15,
+      color: spdAdj === 0 ? C.textMuted : C.orange
+    }
+  }, (spdAdj > 0 ? "+" : "") + spdAdj.toFixed(1), " mph")), /*#__PURE__*/React.createElement("button", {
+    "aria-label": "Speed up",
+    onClick: () => bumpSpeed(0.1),
+    style: {
+      width: 54,
+      height: 54,
+      borderRadius: "50%",
+      background: C.card,
+      border: "1.5px solid " + C.border,
+      color: C.textPrimary,
+      fontSize: 26,
+      fontWeight: 700
+    }
+  }, "+")), /*#__PURE__*/React.createElement("button", {
+    "aria-expanded": showDetails,
+    onClick: () => {
+      haptic();
+      setShowDetails(v => !v);
+    },
+    style: {
+      marginTop: 14,
+      fontFamily: "'IBM Plex Mono',monospace",
+      fontSize: 11,
+      letterSpacing: ".08em",
+      textTransform: "uppercase",
+      color: C.textMuted,
+      background: "none",
+      border: "none",
+      padding: "4px 8px"
+    }
+  }, showDetails ? "▲ Hide details" : "▾ Pace · cadence · heart rate"), showDetails && /*#__PURE__*/React.createElement(DetailsPanel, {
+    C: C,
+    profile: profile,
+    iv: iv,
+    effSpeed: effSpeed,
+    cadenceOn: cadenceOn,
+    onToggleCadence: onToggleCadence,
+    hr: hr,
+    hrZone: hrZone,
+    hrSupported: hrSupported,
+    onConnectHR: connectHR
+  }), /*#__PURE__*/React.createElement("div", {
     className: "up-next",
     "aria-live": "polite"
-  }, curIdx < intervals.length - 1 ? /*#__PURE__*/React.createElement(React.Fragment, null, "Up next · ", /*#__PURE__*/React.createElement("b", null, intervals[curIdx + 1].name), " · ", intervals[curIdx + 1].duration, " min") : /*#__PURE__*/React.createElement(React.Fragment, null, "Up next · ", /*#__PURE__*/React.createElement("b", null, "Finish"), " 🎉"))), iv.type === "run" && /*#__PURE__*/React.createElement("div", {
+  }, curIdx < intervals.length - 1 ? /*#__PURE__*/React.createElement(React.Fragment, null, "Up next · ", /*#__PURE__*/React.createElement("b", null, intervals[curIdx + 1].name), " · ", intervals[curIdx + 1].duration, " min") : /*#__PURE__*/React.createElement(React.Fragment, null, "Up next · ", /*#__PURE__*/React.createElement("b", null, "Finish"), " 🎉"))), /*#__PURE__*/React.createElement("div", {
     className: "emerg",
-    role: "alert"
-  }, "🛑 Sharp pain or dizziness? Straddle the belt and stop. No workout is worth an injury."), /*#__PURE__*/React.createElement("div", {
+    role: "note",
+    style: {
+      background: C.red + "12",
+      borderColor: C.red + "40"
+    }
+  }, "🛑 Feel sharp pain or dizzy? Straddle the belt (feet on the rails) and stop. Hit Finish below. No session is worth an injury."), paused && pausedLong && /*#__PURE__*/React.createElement("div", {
+    className: "mono",
+    style: {
+      textAlign: "center",
+      fontSize: 12,
+      color: C.orange,
+      paddingBottom: 4
+    }
+  }, "Still there? Your session's paused, resume whenever you're ready."), /*#__PURE__*/React.createElement("div", {
     className: "wk-strip",
     "aria-hidden": "true"
   }, intervals.map((seg, i) => /*#__PURE__*/React.createElement("div", {
@@ -4246,6 +4543,9 @@ function WorkoutMode({
     className: "wk-ctrls"
   }, /*#__PURE__*/React.createElement("button", {
     className: "ctrl-pause",
+    style: {
+      flex: 2
+    },
     onClick: () => {
       setPaused(p => {
         const np = !p;
@@ -4261,13 +4561,20 @@ function WorkoutMode({
     }
   }, paused ? "Resume" : "Pause"), /*#__PURE__*/React.createElement("button", {
     className: "ctrl-finish",
+    style: {
+      flex: 1,
+      fontSize: 14,
+      opacity: .9
+    },
+    "aria-label": "Finish this session early",
     onClick: () => {
+      if (!confirm("Finish this session now? We'll log what you've done so far.")) return;
       doneRef.current = true;
       clearInterval(ivRef.current);
       persistActive(null);
       setPhase("checkin");
     }
-  }, "Finish")));
+  }, "Finish early")));
 }
 
 /* ============================================================
