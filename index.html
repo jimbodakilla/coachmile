@@ -505,6 +505,55 @@ function makeCSS(C, simplified) {
 /* friendlier empty week */
 .empty-week{background:${C.card};border:1px dashed ${C.border};border-radius:14px;padding:18px 16px;text-align:center;font-size:13px;color:${C.textSecondary};line-height:1.5;box-shadow:${cardShadow};}
 
+/* workout history */
+.hist-item{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid ${C.borderSoft};}
+.hist-item:last-child{border-bottom:none;}
+.hist-ico{width:36px;height:36px;border-radius:10px;background:${C.orange}14;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.hist-main{flex:1;min-width:0;}
+.hist-t{font-size:14px;color:${C.textPrimary};font-weight:600;}
+.hist-meta{font-size:11.5px;color:${C.textMuted};font-family:${MONO};margin-top:1px;}
+.hist-mood{font-size:19px;flex-shrink:0;}
+.hist-date{font-size:11px;color:${C.textMuted};font-family:${MONO};flex-shrink:0;text-align:right;min-width:52px;}
+
+/* full-plan overview */
+.pv-toggle{display:flex;gap:6px;background:${C.cardAlt};border:1px solid ${C.border};border-radius:12px;padding:4px;margin-bottom:14px;}
+.pv-toggle button{flex:1;padding:8px;border-radius:9px;font-size:12.5px;font-family:${MONO};color:${C.textMuted};}
+.pv-toggle button.on{background:${C.card};color:${C.orange};box-shadow:${cardShadow};}
+.pv-week{display:flex;align-items:center;gap:12px;padding:11px 13px;border-radius:13px;border:1px solid ${C.border};background:${C.card};margin-bottom:8px;box-shadow:${cardShadow};}
+.pv-week.cur{border-color:${C.orange};background:${C.orange}0C;}
+.pv-wn{font-family:${HEAD};font-weight:700;font-size:15px;width:30px;flex-shrink:0;text-align:center;}
+.pv-info{flex:1;min-width:0;}
+.pv-block{font-size:13px;color:${C.textPrimary};font-weight:600;display:flex;align-items:center;gap:7px;}
+.pv-tag{font-family:${MONO};font-size:9px;letter-spacing:.06em;text-transform:uppercase;padding:2px 6px;border-radius:8px;}
+.pv-dots{display:flex;gap:4px;margin-top:5px;}
+.pv-dot{width:8px;height:8px;border-radius:2px;}
+.pv-legend{display:flex;gap:14px;flex-wrap:wrap;margin:2px 0 14px;font-size:11px;color:${C.textSecondary};}
+.pv-legend span{display:flex;align-items:center;gap:5px;}
+.pv-legend i{width:10px;height:10px;border-radius:3px;display:inline-block;}
+.blkbar{width:4px;align-self:stretch;border-radius:3px;flex-shrink:0;}
+
+/* day swap */
+.swap-banner{background:${C.info}12;border:1px solid ${C.info}40;border-radius:12px;padding:10px 13px;font-size:12.5px;color:${C.textSecondary};margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.swap-banner b{color:${C.info};}
+.cal-day.swapping{border-color:${C.info};background:${C.info}14;animation:pulseSwap 1.2s ease-in-out infinite;}
+@keyframes pulseSwap{0%,100%{opacity:1;}50%{opacity:.55;}}
+
+/* up-next */
+.up-next{font-family:${MONO};font-size:11.5px;color:${C.textMuted};letter-spacing:.03em;text-align:center;margin-top:12px;}
+.up-next b{color:${C.textSecondary};}
+
+/* identity hero */
+.id-hero{background:linear-gradient(150deg,${C.card},${C.cardAlt});border:1px solid ${C.border};border-radius:20px;padding:20px;box-shadow:${cardShadow};}
+.id-top{display:flex;align-items:center;gap:14px;}
+.id-ava{width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,${C.purple},${C.orange});display:flex;align-items:center;justify-content:center;font-family:${HEAD};font-weight:700;font-size:22px;color:#fff;flex-shrink:0;}
+.id-name{font-family:${HEAD};font-weight:700;font-size:22px;color:${C.textPrimary};line-height:1.1;}
+.id-since{font-size:12px;color:${C.textMuted};font-family:${MONO};margin-top:3px;}
+.id-stats{display:flex;gap:10px;margin-top:16px;}
+.id-stat{flex:1;background:${C.card};border:1px solid ${C.border};border-radius:12px;padding:11px 8px;text-align:center;}
+.id-sn{font-family:${HEAD};font-weight:700;font-size:19px;color:${C.orange};}
+.id-sl{font-size:9.5px;color:${C.textMuted};font-family:${MONO};letter-spacing:.05em;text-transform:uppercase;margin-top:2px;}
+.metrics-toggle{width:100%;text-align:left;background:${C.card};border:1px solid ${C.border};border-radius:12px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;font-size:14px;color:${C.textSecondary};font-family:${BODY};}
+
 .streak-row{display:flex;gap:10px;}
 .streak-pill{flex:1;background:${C.card};border:1px solid ${C.border};border-radius:14px;padding:13px 14px;display:flex;align-items:center;gap:10px;box-shadow:${cardShadow};}
 .streak-ico{font-size:22px;}
@@ -875,11 +924,54 @@ function capFromDuration(rd) {
     "30+ min": 15
   }[rd] || 0;
 }
-function buildRunDay(variant, goals, timeTarget, runDuration, week) {
-  // #5 progression: run blocks grow, walk recoveries shrink as the weeks advance
+/* #21 periodization — named 4-week blocks, deloads every 4th week, week-12 graduation */
+const PATTERNS = {
+  2: ["run", "rest", "rest", "run", "rest", "rest", "rest"],
+  3: ["run", "rest", "run", "rest", "rest", "run", "rest"],
+  4: ["run", "rest", "run", "walk", "rest", "run", "rest"],
+  5: ["run", "walk", "run", "rest", "run", "walk", "rest"],
+  6: ["run", "walk", "run", "walk", "run", "run", "rest"]
+};
+function blockOf(week) {
+  return week <= 4 ? {
+    name: "Foundation",
+    key: "foundation"
+  } : week <= 8 ? {
+    name: "Build",
+    key: "build"
+  } : {
+    name: "Peak",
+    key: "peak"
+  };
+}
+function isDeload(week) {
+  return week % 4 === 0 && week < 12;
+} // weeks 4 & 8 are recovery
+function isGraduation(week) {
+  return week >= 12;
+} // week 12 is taper + graduation
+function shapeTitle(shape, deload, grad) {
+  if (grad && (shape === "long" || shape === "quality")) return "Graduation 5K";
+  if (deload) return "Recovery Run";
+  return shape === "long" ? "Long Run" : shape === "easy" ? "Easy Run" : "Interval Run";
+}
+function buildRunDay(variant, goals, timeTarget, runDuration, week, shape, deload) {
   const wk = Math.max(1, week || 1);
   const runMult = 1 + (wk - 1) * 0.10;
   const walkMult = Math.max(0.5, 1 - (wk - 1) * 0.05);
+  // #11/#14 session shape — quality (intervals), easy, or long
+  let timeMult = 1,
+    runShapeMult = 1,
+    easySpeed = 0;
+  if (shape === "easy") {
+    timeMult = 0.8;
+    easySpeed = -0.3;
+  } else if (shape === "long") {
+    timeMult = 1.4;
+  } else {
+    runShapeMult = 1.1;
+  } // quality
+  if (deload || isGraduation(wk)) timeMult *= 0.7; // deload weeks & week-12 taper
   const cap = capFromDuration(runDuration);
   const baseRun = cap != 0 ? Math.max(1, Math.min(cap, Math.round(cap * 0.6))) : null;
   const src = CYCLES[variant];
@@ -896,7 +988,8 @@ function buildRunDay(variant, goals, timeTarget, runDuration, week) {
       };
       if (c.type === "run") {
         const start = baseRun != null ? baseRun : c.duration;
-        c.duration = Math.max(1, Math.round(start * runMult));
+        c.duration = Math.max(1, Math.round(start * runMult * runShapeMult));
+        if (easySpeed) c.speed = +Math.max(3, c.speed + easySpeed).toFixed(1);
       }
       if (c.type === "walk") {
         c.duration = Math.max(1, Math.round(c.duration * walkMult));
@@ -907,13 +1000,12 @@ function buildRunDay(variant, goals, timeTarget, runDuration, week) {
   const tpl = applyGoals(base, goals);
   const cycleLen = tpl.cycle.reduce((s, x) => s + x.duration, 0);
   const fixed = tpl.warmup.duration + tpl.cool.duration + (tpl.stress ? 2 : 0);
-  // #3 duration ceiling (grows slightly with the weeks) so beginners aren't handed a 45-min day
   const durCap = Math.min(60, ({
     A: 30,
     B: 35,
     C: 60
   }[variant] || 45) + (wk - 1) * 2);
-  const effTime = Math.min(timeTarget || 30, durCap);
+  const effTime = Math.min(timeTarget || 30, durCap) * timeMult;
   const workMin = Math.max(cycleLen, effTime - fixed);
   const nCycles = Math.max(1, Math.round(workMin / cycleLen));
   const ivs = [{
@@ -1004,28 +1096,42 @@ function buildWalkDay(goals, timeTarget) {
     focus
   };
 }
-function buildPlan(profile, lastCheckin) {
+function weekPattern(profile, week, swaps) {
+  const days = profile.daysPerWeek || 4;
+  const base = PATTERNS[Math.min(6, Math.max(2, days))] || PATTERNS[4];
+  if (swaps && swaps[week] && Array.isArray(swaps[week]) && swaps[week].length === 7) return swaps[week];
+  return base;
+}
+function buildPlan(profile, lastCheckin, opts) {
+  opts = opts || {};
   const base = abilityToPlan(profile.runningAbility || "");
   const goals = Array.isArray(profile.mainGoal) ? profile.mainGoal : profile.mainGoal ? [profile.mainGoal] : [];
   const timeTarget = typeof profile.timeAvailable === "number" ? profile.timeAvailable : parseInt(profile.timeAvailable) || 30;
   const runDuration = profile.runningAbility && profile.runningAbility !== "Can't run yet" ? profile.runDuration : "";
-  const week = computeWeek(profile);
-  const days = profile.daysPerWeek || 4;
+  const week = opts.weekOverride || computeWeek(profile);
+  const deload = isDeload(week),
+    grad = isGraduation(week);
+  const blk = blockOf(week).name;
   const dow = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  const patterns = {
-    2: ["run", "rest", "rest", "run", "rest", "rest", "rest"],
-    3: ["run", "rest", "run", "rest", "rest", "run", "rest"],
-    4: ["run", "rest", "run", "walk", "rest", "run", "rest"],
-    5: ["run", "walk", "run", "rest", "run", "walk", "rest"],
-    6: ["run", "walk", "run", "walk", "run", "run", "rest"]
-  };
-  const pat = patterns[Math.min(6, Math.max(2, days))] || patterns[4];
+  const pat = weekPattern(profile, week, opts.swaps);
+  const runIdxs = pat.map((s, i) => s === "run" ? i : -1).filter(i => i >= 0);
+  const shapeByIdx = {};
+  runIdxs.forEach((idx, k) => {
+    if (k === 0) shapeByIdx[idx] = "quality";else if (k === runIdxs.length - 1 && runIdxs.length >= 2 && week >= 3) shapeByIdx[idx] = "long";else shapeByIdx[idx] = "easy";
+  });
   return pat.map((slot, i) => {
-    if (slot === "rest") return {
-      day: dow[i],
-      type: "rest",
+    const meta = {
       planKey: base,
       goals,
+      week,
+      block: blk,
+      deload,
+      graduation: grad
+    };
+    if (slot === "rest") return {
+      ...meta,
+      day: dow[i],
+      type: "rest",
       title: "Rest & Recover",
       intervals: [],
       totalMin: 0,
@@ -1034,38 +1140,56 @@ function buildPlan(profile, lastCheckin) {
     if (slot === "walk") {
       const w = buildWalkDay(goals, timeTarget);
       return {
+        ...meta,
         day: dow[i],
         type: "walk",
-        planKey: base,
-        goals,
         title: w.title,
         intervals: w.ivs,
         totalMin: totalMinutes(w.ivs),
         focus: w.focus
       };
     }
-    let variant = base;
-    let recoveryNote = null;
-    if (i === 0 && lastCheckin && lastCheckin.soreness === "Sore" && lastCheckin.energy === "Low") {
+    let variant = base,
+      recoveryNote = null;
+    if (i === runIdxs[0] && lastCheckin && lastCheckin.soreness === "Sore" && lastCheckin.energy === "Low") {
       variant = "A";
       recoveryNote = "You logged sore + low energy last time, so today is a lighter recovery-style run.";
     }
-    const built = buildRunDay(variant, goals, timeTarget, runDuration, week);
-    const focus = goals.length ? goals.slice(0, 2).join(" · ") : PLAN_VARIANTS[variant].tag;
+    const shape = shapeByIdx[i] || "quality";
+    const built = buildRunDay(variant, goals, timeTarget, runDuration, week, shape, deload);
+    const title = shapeTitle(shape, deload, grad);
+    const focus = deload ? "Deload week — easy on purpose" : grad ? "Taper & graduate" : goals.length ? goals.slice(0, 2).join(" · ") : PLAN_VARIANTS[variant].tag;
     return {
+      ...meta,
       day: dow[i],
       type: "run",
-      planKey: base,
       runVariant: variant,
-      goals,
+      shape,
       mods: built.mods,
-      title: "Run Intervals",
+      title,
       intervals: built.ivs,
       totalMin: totalMinutes(built.ivs),
       focus,
       recoveryNote
     };
   });
+}
+/* light 12-week overview data (no interval detail) */
+function planOverview(profile, swaps) {
+  const cur = computeWeek(profile);
+  const out = [];
+  for (let w = 1; w <= 12; w++) {
+    const pat = weekPattern(profile, w, swaps);
+    out.push({
+      week: w,
+      block: blockOf(w).name,
+      deload: isDeload(w),
+      graduation: isGraduation(w),
+      current: w === cur,
+      slots: pat
+    });
+  }
+  return out;
 }
 
 /* ============================================================
@@ -1144,7 +1268,8 @@ const K = {
   water: "coachmile_water",
   active: "coachmile_active",
   events: "coachmile_events",
-  daily: "coachmile_daily"
+  daily: "coachmile_daily",
+  swaps: "coachmile_swaps"
 };
 const SCHEMA_VERSION = 2;
 
@@ -1583,15 +1708,26 @@ function Onboarding({
       key: cur && cur.key,
       step
     });
-    if (step < steps.length - 1) setStep(s => s + 1);else setPhase("parq");
+    if (step < steps.length - 1) setStep(s => s + 1);else setPhase("review");
   };
   const back = () => {
     if (phase === "parq") {
+      setPhase("review");
+      return;
+    }
+    if (phase === "review") {
       setPhase("steps");
       setStep(steps.length - 1);
       return;
     }
     if (step > 0) setStep(s => s - 1);
+  };
+  const jumpTo = key => {
+    const idx = steps.findIndex(s => s.key === key);
+    if (idx >= 0) {
+      setPhase("steps");
+      setStep(idx);
+    }
   };
   const parqDone = parq.every(x => x !== null);
   const doGenerate = () => setPhase("generating");
@@ -1622,6 +1758,61 @@ function Onboarding({
     }, "Building your plan, ", answers.name || "friend"), /*#__PURE__*/React.createElement("div", {
       className: "gen-step mono"
     }, msgs[genStep]));
+  }
+  if (phase === "review") {
+    const fmtH = v => Math.floor(v / 12) + "'" + v % 12 + '"';
+    const g = Array.isArray(answers.mainGoal) ? answers.mainGoal.join(", ") : answers.mainGoal;
+    const R = [["name", "Name", answers.name], ["age", "Age", answers.age], ["height", "Height", fmtH(answers.height)], ["currentWeight", "Current weight", answers.currentWeight + " lbs"], ["goalWeight", "Goal weight", answers.goalWeight + " lbs"], ["runningAbility", "Running level", answers.runningAbility]];
+    if (answers.runningAbility !== "Can't run yet" && answers.runDuration) R.push(["runDuration", "Can run for", answers.runDuration]);
+    R.push(["mainGoal", "Goals", g || "—"], ["daysPerWeek", "Days / week", answers.daysPerWeek + ""], ["timeAvailable", "Session length", answers.timeAvailable + " min"]);
+    if (answers.gender === "Female" && answers.cyclePhase) R.push(["cyclePhase", "Cycle phase", answers.cyclePhase]);
+    return /*#__PURE__*/React.createElement("div", {
+      className: "ob"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "ob-prog"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "ob-prog-fill",
+      style: {
+        transform: "scaleX(" + progPct / 100 + ")"
+      }
+    })), /*#__PURE__*/React.createElement("button", {
+      className: "ob-back mono",
+      onClick: back
+    }, "← Back"), /*#__PURE__*/React.createElement("div", {
+      className: "ob-q"
+    }, "Here's what we heard"), /*#__PURE__*/React.createElement("div", {
+      className: "ob-hint"
+    }, "Tap anything to fix it before we build your plan."), /*#__PURE__*/React.createElement("div", {
+      className: "card",
+      style: {
+        padding: "4px 16px"
+      }
+    }, R.map(([k, l, v]) => /*#__PURE__*/React.createElement("button", {
+      key: k,
+      className: "prof-row",
+      style: {
+        width: "100%",
+        textAlign: "left"
+      },
+      onClick: () => {
+        haptic();
+        jumpTo(k);
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "prof-lab"
+    }, l), /*#__PURE__*/React.createElement("div", {
+      className: "prof-val"
+    }, v, " ", /*#__PURE__*/React.createElement("span", {
+      className: "prof-edit"
+    }, "✎"))))), /*#__PURE__*/React.createElement("div", {
+      className: "ob-foot"
+    }, /*#__PURE__*/React.createElement("button", {
+      className: "btn-primary",
+      onClick: () => {
+        haptic();
+        setPhase("parq");
+      }
+    }, "Looks right → continue")));
   }
   if (phase === "parq") {
     const PQ = ["Has a doctor ever said you have a heart condition and should only exercise under medical supervision?", "Do you feel chest pain when you do physical activity?", "Have you lost your balance from dizziness or lost consciousness in the last 12 months?"];
@@ -1685,10 +1876,26 @@ function Onboarding({
     style: {
       transform: "scaleX(" + progPct / 100 + ")"
     }
-  })), step > 0 && /*#__PURE__*/React.createElement("button", {
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 6
+    }
+  }, step > 0 ? /*#__PURE__*/React.createElement("button", {
     className: "ob-back mono",
+    style: {
+      margin: 0
+    },
     onClick: back
-  }, "← Back"), step === 0 && /*#__PURE__*/React.createElement("div", {
+  }, "← Back") : /*#__PURE__*/React.createElement("span", null), /*#__PURE__*/React.createElement("span", {
+    className: "mono",
+    style: {
+      fontSize: 11,
+      color: C.textMuted
+    }
+  }, "Step ", step + 1, " of ", steps.length)), step === 0 && /*#__PURE__*/React.createElement("div", {
     className: "eyebrow",
     style: {
       marginBottom: 10
@@ -2514,7 +2721,11 @@ function WorkoutMode({
           },
           cals: calcCals(),
           minutes: Math.round(elapsedRef.current / 60),
+          miles: +distRef.current.toFixed(2),
           intervals: intervals.length,
+          title: day.title,
+          wtype: day.type,
+          planKey: day.planKey,
           logOnly: true
         });
         setPhase("stretch");
@@ -2529,7 +2740,11 @@ function WorkoutMode({
           },
           cals: calcCals(),
           minutes: Math.round(elapsedRef.current / 60),
+          miles: +distRef.current.toFixed(2),
           intervals: intervals.length,
+          title: day.title,
+          wtype: day.type,
+          planKey: day.planKey,
           logOnly: true
         });
         setPhase("done");
@@ -2665,7 +2880,10 @@ function WorkoutMode({
     }
   }, liveDist.toFixed(2)), /*#__PURE__*/React.createElement("div", {
     className: "tread-l"
-  }, "Miles")))), iv.type === "run" && /*#__PURE__*/React.createElement("div", {
+  }, "Miles"))), /*#__PURE__*/React.createElement("div", {
+    className: "up-next",
+    "aria-live": "polite"
+  }, curIdx < intervals.length - 1 ? /*#__PURE__*/React.createElement(React.Fragment, null, "Up next · ", /*#__PURE__*/React.createElement("b", null, intervals[curIdx + 1].name), " · ", intervals[curIdx + 1].duration, " min") : /*#__PURE__*/React.createElement(React.Fragment, null, "Up next · ", /*#__PURE__*/React.createElement("b", null, "Finish"), " 🎉"))), iv.type === "run" && /*#__PURE__*/React.createElement("div", {
     className: "emerg",
     role: "alert"
   }, "🛑 Sharp pain or dizziness? Straddle the belt and stop. No workout is worth an injury."), /*#__PURE__*/React.createElement("div", {
@@ -2817,12 +3035,22 @@ function CompletionScreen({
 /* ============================================================
    TRAIN SCREEN
    ============================================================ */
+function blockColor(C, name) {
+  return name === "Foundation" ? C.blue : name === "Build" ? C.orange : C.green;
+}
+function slotColor(C, s) {
+  return s === "run" ? C.orange : s === "walk" ? C.blue : C.border;
+}
 function TrainScreen({
   C,
   plan,
-  profile
+  profile,
+  swaps,
+  onSwapDays
 }) {
   const [sel, setSel] = useState(0);
+  const [view, setView] = useState("week");
+  const [swapFrom, setSwapFrom] = useState(null);
   const typeGlyph = {
     run: "run",
     walk: "walk",
@@ -2834,34 +3062,58 @@ function TrainScreen({
     rest: "Rest"
   };
   const day = plan[sel];
-  const goals = Array.isArray(profile.mainGoal) ? profile.mainGoal : [];
+  const week = computeWeek(profile);
+  const overview = planOverview(profile, swaps);
+  const onDayTap = i => {
+    haptic();
+    if (swapFrom !== null) {
+      if (swapFrom !== i) onSwapDays(swapFrom, i);
+      setSwapFrom(null);
+      return;
+    }
+    track("day_tap", {
+      day: plan[i].day,
+      type: plan[i].type
+    });
+    setSel(i);
+  };
   return /*#__PURE__*/React.createElement("div", {
     className: "scroll"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "fu1",
+    className: "pv-toggle fu1",
     style: {
-      marginTop: 4
+      marginTop: 6
     }
+  }, /*#__PURE__*/React.createElement("button", {
+    className: view === "week" ? "on" : "",
+    onClick: () => {
+      haptic();
+      setSwapFrom(null);
+      setView("week");
+    }
+  }, "This week"), /*#__PURE__*/React.createElement("button", {
+    className: view === "plan" ? "on" : "",
+    onClick: () => {
+      haptic();
+      setView("plan");
+    }
+  }, "Full 12 weeks")), view === "week" ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "fu1"
   }, /*#__PURE__*/React.createElement("div", {
     className: "eyebrow",
     style: {
       marginBottom: 10
     }
-  }, "Week ", computeWeek(profile), " · Your Plan ", plan[0].planKey), /*#__PURE__*/React.createElement("div", {
+  }, "Week ", week, " · ", day.block, " block · Plan ", plan[0].planKey), swapFrom !== null && /*#__PURE__*/React.createElement("div", {
+    className: "swap-banner"
+  }, /*#__PURE__*/React.createElement("span", null, "⇄"), /*#__PURE__*/React.createElement("span", null, "Tap another day to swap with ", /*#__PURE__*/React.createElement("b", null, plan[swapFrom].day), ", or tap ", plan[swapFrom].day, " again to cancel.")), /*#__PURE__*/React.createElement("div", {
     className: "cal-strip"
   }, plan.map((d, i) => /*#__PURE__*/React.createElement("button", {
     key: i,
-    className: "cal-day " + (sel === i ? "sel" : ""),
+    className: "cal-day " + (sel === i && swapFrom === null ? "sel" : "") + (swapFrom === i ? " swapping" : ""),
     "aria-label": d.day + " — " + typeLabel[d.type],
     "aria-pressed": sel === i,
-    onClick: () => {
-      haptic();
-      track("day_tap", {
-        day: d.day,
-        type: d.type
-      });
-      setSel(i);
-    }
+    onClick: () => onDayTap(i)
   }, /*#__PURE__*/React.createElement("div", {
     className: "cal-dow"
   }, d.day), /*#__PURE__*/React.createElement("div", {
@@ -2869,7 +3121,7 @@ function TrainScreen({
   }, /*#__PURE__*/React.createElement(Glyph, {
     name: typeGlyph[d.type],
     size: 19,
-    color: sel === i ? C.orange : C.textSecondary
+    color: sel === i && swapFrom === null || swapFrom === i ? C.orange : C.textSecondary
   })))))), /*#__PURE__*/React.createElement("div", {
     className: "card fu2 section-gap-sm"
   }, /*#__PURE__*/React.createElement("div", {
@@ -2889,7 +3141,19 @@ function TrainScreen({
       fontSize: 13,
       marginBottom: day.type === "run" ? 8 : 0
     }
-  }, day.focus), day.type === "run" && day.mods && day.mods.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, day.focus), day.deload && /*#__PURE__*/React.createElement("div", {
+    className: "goal-chips",
+    style: {
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "goal-chip",
+    style: {
+      color: C.yellow,
+      background: C.yellow + "14",
+      borderColor: C.yellow + "33"
+    }
+  }, "Deload · lighter on purpose")), day.type === "run" && day.mods && day.mods.length > 0 && /*#__PURE__*/React.createElement("div", {
     className: "goal-chips",
     style: {
       marginBottom: 8
@@ -2924,9 +3188,15 @@ function TrainScreen({
       fontSize: 14,
       lineHeight: 1.6
     }
-  }, "🌙 Rest is where the adaptation happens. Your muscles rebuild, your joints recover, and tomorrow you come back stronger. A gentle 10-minute walk is welcome — but don't chase intensity today.")), /*#__PURE__*/React.createElement("div", {
+  }, "Rest is where the adaptation happens. Your muscles rebuild, your joints recover, and tomorrow you come back stronger. A gentle 10-minute walk is welcome — but don't chase intensity today."), swapFrom === null && /*#__PURE__*/React.createElement("button", {
+    className: "btn-soft",
+    onClick: () => {
+      haptic();
+      setSwapFrom(sel);
+    }
+  }, "⇄ Move ", day.day, " to another day")), /*#__PURE__*/React.createElement("div", {
     className: "progress-note fu3 section-gap-sm"
-  }, /*#__PURE__*/React.createElement("b", null, "Week-over-week:"), " ", plan[0].planKey === "C" ? "Run blocks grow this week — your aerobic base is expanding." : plan[0].planKey === "B" ? "Run intervals stretch with shorter walk recoveries. You're bridging toward continuous running." : "Run bursts are steady this week while your body adapts. Next week we lengthen them.", goals.includes("Build endurance") && " Your endurance goal keeps the run blocks on the longer side."), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("b", null, day.block, " block:"), " ", day.block === "Foundation" ? "Building the habit and your base. Sessions stay gentle while your body adapts." : day.block === "Build" ? "Run blocks lengthen and walk recoveries shrink — you're bridging toward continuous running." : "Peak weeks. Longer runs, then a taper into your graduation session."), /*#__PURE__*/React.createElement("div", {
     className: "card fu4 section-gap-sm"
   }, /*#__PURE__*/React.createElement("div", {
     className: "eyebrow",
@@ -2952,7 +3222,79 @@ function TrainScreen({
       fontSize: 13,
       lineHeight: 1.55
     }
-  }, "Incline walking between runs burns real fat and grows your aerobic base with almost none of the impact of running. It's how you train more often without breaking your legs down — and it makes your run days feel easier.")));
+  }, "Incline walking between runs burns real fat and grows your aerobic base with almost none of the impact of running. It's how you train more often without breaking your legs down — and it makes your run days feel easier."))) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "fu1"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "eyebrow",
+    style: {
+      marginBottom: 8
+    }
+  }, "Your 12 weeks · 3 blocks"), /*#__PURE__*/React.createElement("div", {
+    className: "pv-legend"
+  }, /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("i", {
+    style: {
+      background: C.orange
+    }
+  }), "Run"), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("i", {
+    style: {
+      background: C.blue
+    }
+  }), "Walk"), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("i", {
+    style: {
+      background: C.border
+    }
+  }), "Rest")), overview.map(w => /*#__PURE__*/React.createElement("div", {
+    className: "pv-week " + (w.current ? "cur" : ""),
+    key: w.week
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "blkbar",
+    style: {
+      background: blockColor(C, w.block)
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "pv-wn",
+    style: {
+      color: w.current ? C.orange : C.textPrimary
+    }
+  }, w.week), /*#__PURE__*/React.createElement("div", {
+    className: "pv-info"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "pv-block"
+  }, w.block, " block", w.current && /*#__PURE__*/React.createElement("span", {
+    className: "pv-tag",
+    style: {
+      color: C.orange,
+      background: C.orange + "1A"
+    }
+  }, "This week"), w.deload && /*#__PURE__*/React.createElement("span", {
+    className: "pv-tag",
+    style: {
+      color: C.yellow,
+      background: C.yellow + "1A"
+    }
+  }, "Deload"), w.graduation && /*#__PURE__*/React.createElement("span", {
+    className: "pv-tag",
+    style: {
+      color: C.green,
+      background: C.green + "1A"
+    }
+  }, "Graduation 🎓")), /*#__PURE__*/React.createElement("div", {
+    className: "pv-dots"
+  }, w.slots.map((s, k) => /*#__PURE__*/React.createElement("span", {
+    key: k,
+    className: "pv-dot",
+    style: {
+      background: slotColor(C, s)
+    }
+  })))))), /*#__PURE__*/React.createElement("div", {
+    className: "muted",
+    style: {
+      fontSize: 12,
+      marginTop: 12,
+      lineHeight: 1.55,
+      textAlign: "center"
+    }
+  }, "Weeks 4 & 8 are deloads — lighter on purpose so your body absorbs the work. Week 12 tapers into a graduation 5K."))));
 }
 
 /* ============================================================
@@ -3200,6 +3542,52 @@ function ProgressScreen({
     style: {
       fontSize: 16
     }
+  }, "Workout history"), /*#__PURE__*/React.createElement("span", {
+    className: "mono",
+    style: {
+      fontSize: 12,
+      color: C.textMuted
+    }
+  }, checkins.length, " logged")), checkins.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    className: "muted",
+    style: {
+      fontSize: 13,
+      padding: "6px 0"
+    }
+  }, "Finish your first session and it lands here — every run, kept.") : [...checkins].reverse().slice(0, 12).map((c, i) => /*#__PURE__*/React.createElement("div", {
+    className: "hist-item",
+    key: i
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "hist-ico"
+  }, /*#__PURE__*/React.createElement(Glyph, {
+    name: c.wtype === "walk" ? "walk" : "run",
+    size: 18,
+    color: C.orange
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "hist-main"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "hist-t"
+  }, c.title || "Run"), /*#__PURE__*/React.createElement("div", {
+    className: "hist-meta"
+  }, c.miles != null ? c.miles.toFixed(2) + " mi · " : "", c.minutes || 0, " min", c.cals ? " · " + c.cals + " kcal" : "")), /*#__PURE__*/React.createElement("div", {
+    className: "hist-mood",
+    title: "Felt " + (c.mood || "")
+  }, c.mood || ""), /*#__PURE__*/React.createElement("div", {
+    className: "hist-date"
+  }, c.date ? c.date.slice(5).replace("-", "/") : "")))), /*#__PURE__*/React.createElement("div", {
+    className: "card fu3 section-gap-sm"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "h-sec",
+    style: {
+      fontSize: 16
+    }
   }, "Weight log"), /*#__PURE__*/React.createElement("span", {
     className: "mono",
     style: {
@@ -3409,9 +3797,12 @@ function ProgressScreen({
 /* ============================================================
    PROFILE SCREEN
    ============================================================ */
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 function ProfileScreen({
   C,
   profile,
+  sessions,
+  streak,
   onUpdate,
   theme,
   setTheme,
@@ -3423,15 +3814,20 @@ function ProfileScreen({
 }) {
   const [editing, setEditing] = useState(null);
   const [val, setVal] = useState("");
+  const [showMetrics, setShowMetrics] = useState(false);
   const fileRef = useRef(null);
   const hIn = profile.height || 66;
   const bmi = (profile.currentWeight || 170) / (hIn * hIn) * 703;
-  const bmiCat = bmi < 18.5 ? "Underweight" : bmi < 25 ? "Healthy" : bmi < 30 ? "Overweight" : "High";
-  const bmiColor = bmi < 18.5 ? C.blue : bmi < 25 ? C.green : bmi < 30 ? C.yellow : C.red;
+  const bmiCat = bmi < 18.5 ? "Underweight" : bmi < 25 ? "Healthy" : bmi < 30 ? "Overweight" : "Above range";
   const bmiKnob = Math.min(96, Math.max(4, (bmi - 15) / (35 - 15) * 100));
   const healthyLo = Math.round(18.5 * hIn * hIn / 703),
     healthyHi = Math.round(24.9 * hIn * hIn / 703);
   const hLabel = Math.floor(hIn / 12) + "'" + hIn % 12 + '"';
+  // #26 identity leads
+  const sd = profile.startDate ? new Date(profile.startDate + "T00:00:00") : new Date();
+  const memberSince = MONTHS[sd.getMonth()] + " " + sd.getFullYear();
+  const planName = PLAN_VARIANTS[abilityToPlan(profile.runningAbility || "")].name;
+  const initial = (profile.name || "C").trim().slice(0, 1).toUpperCase();
   const startEdit = (field, cur) => {
     setEditing(field);
     setVal(String(cur));
@@ -3505,21 +3901,73 @@ function ProfileScreen({
   return /*#__PURE__*/React.createElement("div", {
     className: "scroll"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "card fu1",
+    className: "id-hero fu1",
     style: {
       marginTop: 4
     }
   }, /*#__PURE__*/React.createElement("div", {
-    className: "eyebrow",
+    className: "id-top"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "id-ava"
+  }, initial), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "id-name"
+  }, profile.name || "Runner"), /*#__PURE__*/React.createElement("div", {
+    className: "id-since"
+  }, "Runner since ", memberSince, " · Plan ", profile.runningAbility ? abilityToPlan(profile.runningAbility) : "B", " · ", planName))), /*#__PURE__*/React.createElement("div", {
+    className: "id-stats"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "id-stat"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "id-sn"
+  }, sessions), /*#__PURE__*/React.createElement("div", {
+    className: "id-sl"
+  }, "Sessions")), /*#__PURE__*/React.createElement("div", {
+    className: "id-stat"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "id-sn"
+  }, streak), /*#__PURE__*/React.createElement("div", {
+    className: "id-sl"
+  }, "Day streak")), /*#__PURE__*/React.createElement("div", {
+    className: "id-stat"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "id-sn"
+  }, computeWeek(profile), /*#__PURE__*/React.createElement("span", {
     style: {
+      fontSize: 12,
+      color: C.textMuted
+    }
+  }, "/12")), /*#__PURE__*/React.createElement("div", {
+    className: "id-sl"
+  }, "Week")))), /*#__PURE__*/React.createElement("div", {
+    className: "section-gap-sm fu2"
+  }, !showMetrics ? /*#__PURE__*/React.createElement("button", {
+    className: "metrics-toggle",
+    onClick: () => setShowMetrics(true)
+  }, /*#__PURE__*/React.createElement("span", null, "Show body metrics"), /*#__PURE__*/React.createElement("span", {
+    className: "dim"
+  }, "BMI & healthy range ›")) : /*#__PURE__*/React.createElement("div", {
+    className: "card"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
       marginBottom: 4
     }
-  }, "Body Mass Index · estimate"), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "eyebrow"
+  }, "Body mass index · estimate"), /*#__PURE__*/React.createElement("button", {
+    className: "dim",
+    style: {
+      fontSize: 12
+    },
+    onClick: () => setShowMetrics(false)
+  }, "Hide")), /*#__PURE__*/React.createElement("div", {
     className: "bmi-wrap"
   }, /*#__PURE__*/React.createElement("div", {
     className: "bmi-num",
     style: {
-      color: bmiColor
+      color: C.textPrimary
     }
   }, bmi.toFixed(1)), /*#__PURE__*/React.createElement("div", {
     className: "mono",
@@ -3542,7 +3990,15 @@ function ProfileScreen({
       marginTop: 12,
       letterSpacing: ".03em"
     }
-  }, "Healthy range for ", hLabel, " · ", healthyLo, "–", healthyHi, " lbs"))), /*#__PURE__*/React.createElement("div", {
+  }, "Healthy range for ", hLabel, " · ", healthyLo, "–", healthyHi, " lbs")), /*#__PURE__*/React.createElement("div", {
+    className: "muted",
+    style: {
+      fontSize: 12,
+      textAlign: "center",
+      marginTop: 10,
+      lineHeight: 1.5
+    }
+  }, "BMI is a rough screen, not a verdict — it ignores muscle and build. Your consistency matters more."))), /*#__PURE__*/React.createElement("div", {
     className: "card fu2 section-gap-sm"
   }, /*#__PURE__*/React.createElement("div", {
     className: "h-sec",
@@ -3827,6 +4283,7 @@ function App() {
   const [workoutDay, setWorkoutDay] = useState(null);
   const [resumeState, setResumeState] = useState(null);
   const [activeSession, setActiveSession] = useState(() => LS.get(K.active, null));
+  const [swaps, setSwaps] = useState(() => LS.get(K.swaps, {}));
   const [ach, setAch] = useState(null);
 
   // #3 real streak / shield / week from history
@@ -3897,7 +4354,28 @@ function App() {
     });
   }, [screen, appPhase]);
   const lastCheckin = checkins.length ? checkins[checkins.length - 1] : null;
-  const plan = useMemo(() => profile ? buildPlan(profile, lastCheckin) : [], [profile, lastCheckin]);
+  const plan = useMemo(() => profile ? buildPlan(profile, lastCheckin, {
+    swaps
+  }) : [], [profile, lastCheckin, swaps]);
+  const curWeek = profile ? computeWeek(profile) : 1;
+  // #56 swap two days within the current week
+  const swapDays = (i, j) => {
+    if (i === j) return;
+    const pat = weekPattern(profile, curWeek, swaps).slice();
+    const t = pat[i];
+    pat[i] = pat[j];
+    pat[j] = t;
+    const ns = {
+      ...swaps,
+      [curWeek]: pat
+    };
+    setSwaps(ns);
+    LS.set(K.swaps, ns);
+    track("day_swap", {
+      from: i,
+      to: j
+    });
+  };
   const weekStats = useMemo(() => {
     const total = checkins.length;
     const minutes = checkins.reduce((s, c) => s + (c.minutes || 0), 0);
@@ -3966,7 +4444,11 @@ function App() {
       const entry = {
         ...res.checkin,
         minutes: res.minutes,
-        cals: res.cals
+        cals: res.cals,
+        miles: res.miles,
+        title: res.title,
+        wtype: res.wtype,
+        planKey: res.planKey
       };
       const nc = [...checkins, entry];
       setCheckins(nc);
@@ -4031,6 +4513,7 @@ function App() {
     setWeightLog([]);
     setWater(0);
     setActiveSession(null);
+    setSwaps({});
     setChecklist(DEFAULT_CHECKLIST.map(x => ({
       ...x
     })));
@@ -4116,7 +4599,9 @@ function App() {
   }, /*#__PURE__*/React.createElement(TrainScreen, {
     C: C,
     plan: plan,
-    profile: profile
+    profile: profile,
+    swaps: swaps,
+    onSwapDays: swapDays
   })), screen === "food" && /*#__PURE__*/React.createElement(ErrorBoundary, {
     name: "food"
   }, /*#__PURE__*/React.createElement(FoodScreen, {
@@ -4140,6 +4625,8 @@ function App() {
   }, /*#__PURE__*/React.createElement(ProfileScreen, {
     C: C,
     profile: profile,
+    sessions: checkins.length,
+    streak: streak,
     onUpdate: updateProfile,
     theme: theme,
     setTheme: setTheme,
