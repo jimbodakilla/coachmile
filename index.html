@@ -6459,44 +6459,115 @@ function FoodScreen({
 /* ============================================================
    PROGRESS SCREEN
    ============================================================ */
+/* #PY gentle, non-judging BMI band wording (Safety) */
+function bmiBand(bmi) {
+  if (bmi < 18.5) return { label: "Below the typical range", ck: "blue" };
+  if (bmi < 25) return { label: "In the healthy range", ck: "green" };
+  if (bmi < 30) return { label: "Above the healthy range", ck: "yellow" };
+  return { label: "Well above the healthy range", ck: "orange" };
+}
+/* planned non-rest sessions from today until you reach targetWeek */
+function sessionsToWeek(profile, targetWeek, todayIdx) {
+  const wk = computeWeek(profile);
+  if (targetWeek <= wk) return 0;
+  let n = 0;
+  const thisWk = buildPlan(profile, null, { weekOverride: wk });
+  for (let i = todayIdx || 0; i < 7; i++) {
+    if (thisWk[i] && thisWk[i].type !== "rest") n++;
+  }
+  for (let w = wk + 1; w < targetWeek; w++) {
+    n += buildPlan(profile, null, { weekOverride: w }).filter(d => d.type !== "rest").length;
+  }
+  return n;
+}
+/* #PY real milestones derived from the plan + actual progress (Dev/UX), behavior-first (Safety) */
+function progressMilestones(profile, checkins, streak) {
+  const cks = checkins || [];
+  const sessions = cks.length;
+  const maxMiles = cks.reduce((m, c) => Math.max(m, c.miles || 0), 0);
+  const maxRunMin = cks.filter(c => c.wtype === "run").reduce((m, c) => Math.max(m, c.minutes || 0), 0);
+  const planKey = abilityToPlan(profile.runningAbility || "");
+  const todayIdx = (new Date().getDay() + 6) % 7;
+  const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+  const out = [
+    { t: "First session logged", done: sessions >= 1, eta: sessions >= 1 ? "Done" : "Your next run" },
+    { t: "A 7-day streak", done: streak >= 7, eta: streak >= 7 ? "Done" : `${Math.max(0, 7 - streak)} days to go` }
+  ];
+  planMilestones(planKey).forEach(([week, label]) => {
+    let done = false;
+    if (/5K/i.test(label)) done = maxMiles >= 3.1;else if (/8K/i.test(label)) done = maxMiles >= 4.97;else if (/20 min/i.test(label)) done = maxRunMin >= 20;else if (/10 min/i.test(label)) done = maxRunMin >= 10;else if (/5 min/i.test(label)) done = maxRunMin >= 5;else if (/60 sec|3 min/i.test(label)) done = maxRunMin >= 3 || sessions >= 3;
+    const s = sessionsToWeek(profile, week, todayIdx);
+    out.push({ t: cap(label), done, eta: done ? "Done" : s > 0 ? `~ ${s} sessions away` : "This week" });
+  });
+  out.push({ t: "20 sessions banked", done: sessions >= 20, eta: sessions >= 20 ? "Done" : `${Math.max(0, 20 - sessions)} to go` });
+  return out;
+}
+/* #PY badge progress hint — how close to a locked achievement (Design) */
+function badgeProgress(a, stats) {
+  const S = stats;
+  switch (a.id) {
+    case "first_workout": return S.sessions >= 1 ? null : "Log your first session";
+    case "first_15": return S.maxMinutes >= 15 ? null : `Best ${S.maxMinutes}/15 min`;
+    case "first_mile": return S.maxMiles >= 1 ? null : `Longest ${S.maxMiles.toFixed(1)}/1.0 mi`;
+    case "streak_3": return S.streak >= 3 ? null : `Streak ${S.streak}/3`;
+    case "streak_7": return S.streak >= 7 ? null : `Streak ${S.streak}/7`;
+    case "ten": return S.sessions >= 10 ? null : `${S.sessions}/10 sessions`;
+    case "five_k": return S.maxMiles >= 3.1 ? null : `Longest ${S.maxMiles.toFixed(1)}/3.1 mi`;
+    default: return null;
+  }
+}
 function RunnerStats({
   C,
   profile,
   checkins
 }) {
-  const runs = (checkins || []).filter(c => c.miles > 0);
-  if (runs.length === 0) return null;
-  const metric = isMetric(profile);
-  let fastest = null;
-  runs.forEach(c => {
-    if (c.miles >= 0.5 && c.minutes) {
-      const p = c.minutes / c.miles;
-      if (fastest == null || p < fastest.p) fastest = {
-        p,
-        m: c.minutes,
-        mi: c.miles
-      };
+  const runs = useMemo(() => (checkins || []).filter(c => c.miles > 0 && c.date), [checkins]);
+  const stats = useMemo(() => {
+    if (runs.length === 0) return null;
+    const metric = isMetric(profile);
+    let fastest = null;
+    runs.forEach(c => {
+      if (c.miles >= 0.5 && c.minutes) {
+        const p = c.minutes / c.miles;
+        if (fastest == null || p < fastest.p) fastest = {
+          p,
+          m: c.minutes,
+          mi: c.miles
+        };
+      }
+    });
+    const longest = runs.reduce((mx, c) => Math.max(mx, c.miles || 0), 0);
+    // single-pass sliding 7-day window for best week (was O(n^2))
+    const sorted = [...runs].sort((a, b) => a.date < b.date ? -1 : 1);
+    let bestWeek = 0,
+      lo = 0,
+      sum = 0;
+    for (let hi = 0; hi < sorted.length; hi++) {
+      sum += sorted[hi].miles || 0;
+      while (lo < hi && daysBetween(sorted[lo].date, sorted[hi].date) > 6) {
+        sum -= sorted[lo].miles || 0;
+        lo++;
+      }
+      if (sum > bestWeek) bestWeek = sum;
     }
-  });
-  const longest = runs.reduce((mx, c) => Math.max(mx, c.miles || 0), 0);
-  let bestWeek = 0;
-  runs.forEach(c => {
-    const start = shiftDay(c.date, -6);
-    const s = runs.filter(x => x.date >= start && x.date <= c.date).reduce((a, x) => a + (x.miles || 0), 0);
-    if (s > bestWeek) bestWeek = s;
-  });
-  const totalElev = (checkins || []).reduce((a, c) => a + (c.elev || 0), 0);
-  const today = todayStr();
-  const weeks = [];
-  for (let w = 5; w >= 0; w--) {
-    const end = shiftDay(today, -7 * w);
-    const start = shiftDay(end, -6);
-    const mi = runs.filter(x => x.date >= start && x.date <= end).reduce((a, x) => a + (x.miles || 0), 0);
-    weeks.push(+mi.toFixed(1));
-  }
-  const maxW = Math.max(1, ...weeks);
-  const climb = metric ? Math.round(totalElev * 0.3048) + " m" : totalElev + " ft";
-  const PR = [["Fastest pace", fastest ? paceFromRun(fastest.m, fastest.mi, profile) : "—"], ["Longest run", longest ? uDistN(longest, profile) + " " + uDistU(profile) : "—"], ["Best week", bestWeek ? uDistN(bestWeek, profile) + " " + uDistU(profile) : "—"], ["Total climb", climb]];
+    const totalElev = (checkins || []).reduce((a, c) => a + (c.elev || 0), 0);
+    const today = todayStr();
+    const weeks = [];
+    for (let w = 5; w >= 0; w--) {
+      const end = shiftDay(today, -7 * w),
+        start = shiftDay(end, -6);
+      const mi = runs.filter(x => x.date >= start && x.date <= end).reduce((a, x) => a + (x.miles || 0), 0);
+      weeks.push(+mi.toFixed(1));
+    }
+    const climb = metric ? Math.round(totalElev * 0.3048) + " m" : totalElev + " ft";
+    const PR = [["Fastest pace", fastest ? paceFromRun(fastest.m, fastest.mi, profile) : "—"], ["Longest run", longest ? uDistN(longest, profile) + " " + uDistU(profile) : "—"], ["Best week", bestWeek ? uDistN(bestWeek, profile) + " " + uDistU(profile) : "—"], ["Total climb", climb]];
+    return {
+      PR,
+      weeks,
+      maxW: Math.max(1, ...weeks)
+    };
+  }, [runs, checkins, profile]);
+  if (!stats) return null;
   return /*#__PURE__*/React.createElement("div", {
     className: "card fu2 section-gap-sm"
   }, /*#__PURE__*/React.createElement("div", {
@@ -6508,72 +6579,61 @@ function RunnerStats({
     style: {
       display: "grid",
       gridTemplateColumns: "1fr 1fr",
-      gap: 10,
-      marginBottom: 16
+      gap: 10
     }
-  }, PR.map(([l, v]) => /*#__PURE__*/React.createElement("div", {
+  }, stats.PR.map(([l, v]) => /*#__PURE__*/React.createElement("div", {
     key: l,
     style: {
-      background: C.card,
-      border: "1px solid " + C.border,
+      background: C.cardAlt,
       borderRadius: 12,
-      padding: "11px 12px"
+      padding: "12px 14px"
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       fontFamily: "'Space Grotesk',sans-serif",
       fontWeight: 700,
-      fontSize: 18,
-      color: C.orange
+      fontSize: 19,
+      color: C.textPrimary
     }
   }, v), /*#__PURE__*/React.createElement("div", {
     className: "mono",
     style: {
-      fontSize: 9.5,
+      fontSize: 10.5,
       color: C.textMuted,
-      letterSpacing: ".05em",
       textTransform: "uppercase",
+      letterSpacing: ".06em",
       marginTop: 2
     }
   }, l)))), /*#__PURE__*/React.createElement("div", {
     className: "eyebrow",
     style: {
-      marginBottom: 8
+      margin: "16px 0 10px"
     }
-  }, "Weekly ", metric ? "distance" : "mileage", " · last 6 weeks"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "flex-end",
-      gap: 7,
-      height: 70
-    },
+  }, "Miles · last 6 weeks"), /*#__PURE__*/React.createElement("div", {
+    className: "mood-chart",
     role: "img",
-    "aria-label": "Weekly " + (metric ? "km" : "miles") + " over the last 6 weeks: " + weeks.map(w => metric ? +(w * 1.60934).toFixed(1) : w).join(", ")
-  }, weeks.map((w, i) => /*#__PURE__*/React.createElement("div", {
+    "aria-label": "Weekly mileage, last 6 weeks: " + stats.weeks.join(", ")
+  }, stats.weeks.map((mi, i) => /*#__PURE__*/React.createElement("div", {
+    className: "mood-col",
     key: i,
-    "aria-hidden": "true",
-    style: {
-      flex: 1,
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      gap: 5,
-      justifyContent: "flex-end"
-    }
+    "aria-hidden": "true"
   }, /*#__PURE__*/React.createElement("div", {
+    className: "chart-bar",
     style: {
-      width: "100%",
-      height: Math.max(4, w / maxW * 54) + "px",
-      background: i === 5 ? C.orange : C.orange + "66",
-      borderRadius: "5px 5px 0 0"
+      width: "60%",
+      height: Math.max(6, mi / stats.maxW * 54) + "px",
+      background: C.orange,
+      borderRadius: 5,
+      animationDelay: i * 0.05 + "s"
     }
   }), /*#__PURE__*/React.createElement("div", {
     className: "mono",
     style: {
-      fontSize: 9,
-      color: C.textMuted
+      fontSize: 9.5,
+      color: C.textMuted,
+      marginTop: 4
     }
-  }, metric ? +(w * 1.60934).toFixed(1) : w)))));
+  }, mi)))));
 }
 function ProgressScreen({
   C,
@@ -6582,225 +6642,126 @@ function ProgressScreen({
   weightLog,
   addWeight,
   weekStats,
-  streak
+  streak,
+  onUpdate,
+  onGoEasy
 }) {
   const [wInput, setWInput] = useState("");
-  const recovery = calcRecoveryScore(checkins);
-  const moodData = getMoodData(checkins);
+  const [showAllHist, setShowAllHist] = useState(false);
+  const [detail, setDetail] = useState(null);
+  const cks = checkins || [];
+  const recovery = useMemo(() => calcRecoveryScore(cks), [cks]);
+  const moodData = useMemo(() => getMoodData(cks).filter(m => m.mood), [cks]);
+  const soreData = useMemo(() => cks.slice(-7).filter(c => c.soreness).map(c => ({
+    v: SORE_VAL[c.soreness] || 2,
+    s: c.soreness
+  })), [cks]);
+  const milestones = useMemo(() => progressMilestones(profile, cks, streak), [profile, cks, streak]);
+  const week = useMemo(() => {
+    const weekAgo = shiftDay(todayStr(), -6);
+    const tw = cks.filter(c => c.date && c.date >= weekAgo);
+    return {
+      s: tw.length,
+      mi: tw.reduce((a, c) => a + (c.miles || 0), 0),
+      mn: tw.reduce((a, c) => a + (c.minutes || 0), 0)
+    };
+  }, [cks]);
   const goalDelta = (profile.currentWeight || 0) - (profile.goalWeight || 0);
   const lost = weightLog.length > 1 ? weightLog[0] - weightLog[weightLog.length - 1] : 0;
   const wl = weightLog.length ? weightLog : [profile.currentWeight || 180];
   const wMin = Math.min(...wl) - 2,
     wMax = Math.max(...wl) + 2;
   const moodColor = v => v >= 4 ? C.green : v >= 3 ? C.yellow : C.red;
+  const soreColor = v => v >= 3 ? C.green : v >= 2 ? C.yellow : C.red;
   const recovColor = recovery == null ? C.textMuted : recovery >= 70 ? C.green : recovery >= 45 ? C.yellow : C.red;
+  const name = profile.name || "friend";
+  const story = week.s === 0 ? "A fresh week, a clean page. Your first session writes the first line." : week.s === 1 ? `One session down this week, the hardest one to start. Keep the thread going, ${name}.` : `That's ${week.s} sessions this week, ${name}. Real, unglamorous, repeatable work, exactly the kind that changes people.`;
+  const headline = weekStats.total === 0 ? "Your story starts here" : streak >= 7 ? `${streak} days strong` : streak >= 2 ? `${streak}-day streak going` : `${weekStats.total} ${weekStats.total === 1 ? "session" : "sessions"} banked`;
+  const histRows = showAllHist ? [...cks].reverse() : [...cks].reverse().slice(0, 8);
   return /*#__PURE__*/React.createElement("div", {
     className: "scroll"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "stat-grid fu1",
+  }, !profile.bodyNeutral && /*#__PURE__*/React.createElement("div", {
+    className: "cycle-banner fu1",
     style: {
-      marginTop: 4
+      marginTop: 4,
+      background: C.blue + "10",
+      border: "1px solid " + C.blue + "2e",
+      color: C.textSecondary,
+      flexDirection: "column",
+      alignItems: "stretch",
+      gap: 8
     }
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "stat-card"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "stat-n"
-  }, weekStats.total), /*#__PURE__*/React.createElement("div", {
-    className: "stat-l"
-  }, "Total workouts")), /*#__PURE__*/React.createElement("div", {
-    className: "stat-card"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "stat-n"
-  }, streak), /*#__PURE__*/React.createElement("div", {
-    className: "stat-l"
-  }, "Day streak")), !profile.bodyNeutral && /*#__PURE__*/React.createElement("div", {
-    className: "stat-card"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "stat-n"
-  }, lost > 0 ? uWt(lost, profile) : uWt(0, profile)), /*#__PURE__*/React.createElement("div", {
-    className: "stat-l"
-  }, "Weight lost"), /*#__PURE__*/React.createElement("div", {
-    className: "stat-sub",
-    style: {
-      color: C.green
-    }
-  }, goalDelta > 0 ? uWt(goalDelta, profile) + " to goal" : "Goal reached 🎉")), /*#__PURE__*/React.createElement("div", {
-    className: "stat-card"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "stat-n"
-  }, weekStats.totalMin), /*#__PURE__*/React.createElement("div", {
-    className: "stat-l"
-  }, "Total minutes"))), (() => {
-    const weekAgo = shiftDay(todayStr(), -6);
-    const tw = checkins.filter(c => c.date && c.date >= weekAgo);
-    const s = tw.length,
-      mi = tw.reduce((a, c) => a + (c.miles || 0), 0),
-      mn = tw.reduce((a, c) => a + (c.minutes || 0), 0);
-    const story = s === 0 ? "A fresh week, a clean page. Your first session writes the first line." : s === 1 ? "One session down this week — the hardest one to start. Keep the thread going, " + (profile.name || "friend") + "." : "That's " + s + " sessions this week, " + (profile.name || "friend") + ". Real, unglamorous, repeatable work — exactly the kind that changes people.";
-    return /*#__PURE__*/React.createElement("div", {
-      className: "recap fu2 section-gap-sm"
-    }, /*#__PURE__*/React.createElement("div", {
-      className: "eyebrow",
-      style: {
-        marginBottom: 2
-      }
-    }, "This week's story"), /*#__PURE__*/React.createElement("div", {
-      className: "recap-story"
-    }, story), /*#__PURE__*/React.createElement("div", {
-      className: "recap-nums"
-    }, /*#__PURE__*/React.createElement("div", {
-      className: "recap-num"
-    }, /*#__PURE__*/React.createElement("div", {
-      className: "n"
-    }, s), /*#__PURE__*/React.createElement("div", {
-      className: "l"
-    }, "Sessions")), /*#__PURE__*/React.createElement("div", {
-      className: "recap-num"
-    }, /*#__PURE__*/React.createElement("div", {
-      className: "n"
-    }, mi.toFixed(1)), /*#__PURE__*/React.createElement("div", {
-      className: "l"
-    }, "Miles")), /*#__PURE__*/React.createElement("div", {
-      className: "recap-num"
-    }, /*#__PURE__*/React.createElement("div", {
-      className: "n"
-    }, mn), /*#__PURE__*/React.createElement("div", {
-      className: "l"
-    }, "Minutes"))));
-  })(), /*#__PURE__*/React.createElement(RunnerStats, {
-    C: C,
-    profile: profile,
-    checkins: checkins
-  }), /*#__PURE__*/React.createElement("div", {
-    className: "card fu3 section-gap-sm"
-  }, /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("span", {
     style: {
       display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      marginBottom: 6
+      gap: 8
     }
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "h-sec",
+  }, /*#__PURE__*/React.createElement("span", null, "🤍"), /*#__PURE__*/React.createElement("span", null, "Prefer to focus on how you feel rather than the scale? Body-neutral mode hides weight, BMI and calories.")), /*#__PURE__*/React.createElement("button", {
+    className: "btn-soft",
     style: {
-      fontSize: 16
-    }
-  }, "Workout history"), /*#__PURE__*/React.createElement("span", {
-    className: "mono",
-    style: {
-      fontSize: 12,
-      color: C.textMuted
-    }
-  }, checkins.length, " logged")), checkins.length === 0 ? /*#__PURE__*/React.createElement("div", {
-    className: "muted",
-    style: {
-      fontSize: 13,
-      padding: "6px 0"
-    }
-  }, "Finish your first session and it shows up here. Every run, kept.") : [...checkins].reverse().slice(0, 12).map((c, i) => /*#__PURE__*/React.createElement("div", {
-    className: "hist-item",
-    key: i
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "hist-ico"
-  }, /*#__PURE__*/React.createElement(Glyph, {
-    name: c.wtype === "walk" ? "walk" : "run",
-    size: 18,
-    color: C.orange
-  })), /*#__PURE__*/React.createElement("div", {
-    className: "hist-main"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "hist-t"
-  }, c.title || "Run"), /*#__PURE__*/React.createElement("div", {
-    className: "hist-meta"
-  }, c.miles != null ? uDistN(c.miles, profile) + " " + uDistU(profile) + " · " : "", c.minutes || 0, " min", c.miles && c.minutes ? " · " + paceFromRun(c.minutes, c.miles, profile) : "", c.cals && !profile.bodyNeutral ? " · " + c.cals + " kcal" : "")), /*#__PURE__*/React.createElement("div", {
-    className: "hist-mood",
-    title: "Felt " + (c.mood || "")
-  }, c.mood || ""), /*#__PURE__*/React.createElement("div", {
-    className: "hist-date"
-  }, c.date ? c.date.slice(5).replace("-", "/") : "")))), !profile.bodyNeutral && /*#__PURE__*/React.createElement("div", {
-    className: "card fu3 section-gap-sm"
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      marginBottom: 6
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "h-sec",
-    style: {
-      fontSize: 16
-    }
-  }, "Weight log"), /*#__PURE__*/React.createElement("span", {
-    className: "mono",
-    style: {
-      fontSize: 12,
-      color: C.textMuted
-    }
-  }, wl.length, " entries")), /*#__PURE__*/React.createElement("div", {
-    className: "chart",
-    role: "img",
-    "aria-label": "Weight log, last " + Math.min(8, wl.length) + " entries: " + wl.slice(-8).map(w => isMetric(profile) ? Math.round(w * 0.453592) : Math.round(w)).join(", ") + (isMetric(profile) ? " kilograms" : " pounds")
-  }, wl.slice(-8).map((w, i) => /*#__PURE__*/React.createElement("div", {
-    className: "chart-col",
-    key: i,
-    "aria-hidden": "true"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "chart-bar",
-    style: {
-      height: Math.max(8, (w - wMin) / (wMax - wMin) * 90) + "px",
-      background: C.orange,
-      animationDelay: i * 0.05 + "s"
-    }
-  }), /*#__PURE__*/React.createElement("div", {
-    className: "chart-x"
-  }, isMetric(profile) ? Math.round(w * 0.453592) : w)))), /*#__PURE__*/React.createElement("table", {
-    className: "sr-only"
-  }, /*#__PURE__*/React.createElement("caption", null, "Weight log entries"), /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Entry"), /*#__PURE__*/React.createElement("th", null, "Weight (", isMetric(profile) ? "kg" : "lbs", ")"))), /*#__PURE__*/React.createElement("tbody", null, wl.slice(-8).map((w, i) => /*#__PURE__*/React.createElement("tr", {
-    key: i
-  }, /*#__PURE__*/React.createElement("td", null, i + 1), /*#__PURE__*/React.createElement("td", null, isMetric(profile) ? Math.round(w * 0.453592) : w))))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 9,
-      marginTop: 14
-    }
-  }, /*#__PURE__*/React.createElement("input", {
-    className: "ob-input",
-    style: {
-      fontSize: 15,
-      padding: 12,
-      flex: 1
-    },
-    inputMode: "numeric",
-    placeholder: "Log today's weight (" + (isMetric(profile) ? "kg" : "lbs") + ")",
-    value: wInput,
-    onChange: e => setWInput(e.target.value.replace(/[^0-9.]/g, ""))
-  }), /*#__PURE__*/React.createElement("button", {
-    className: "ctrl-finish",
-    style: {
-      flex: "none",
-      padding: "0 22px"
+      margin: 0,
+      alignSelf: "flex-start",
+      padding: "7px 14px"
     },
     onClick: () => {
-      const v = parseFloat(wInput);
-      if (v > 0) {
-        addWeight(isMetric(profile) ? +(v / 0.453592).toFixed(1) : v);
-        setWInput("");
-      }
+      haptic();
+      onUpdate({
+        ...profile,
+        bodyNeutral: true
+      });
     }
-  }, "+ Add"))), /*#__PURE__*/React.createElement("div", {
-    className: "card fu3 section-gap-sm"
+  }, "Turn on body-neutral →")), /*#__PURE__*/React.createElement("div", {
+    className: "recap fu1 section-gap-sm"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "eyebrow",
+    style: {
+      marginBottom: 6
+    }
+  }, "This week"), /*#__PURE__*/React.createElement("div", {
+    className: "syne",
+    style: {
+      fontFamily: "'Space Grotesk',sans-serif",
+      fontWeight: 700,
+      fontSize: 26,
+      color: C.textPrimary,
+      letterSpacing: "-.02em",
+      marginBottom: 8
+    }
+  }, headline), /*#__PURE__*/React.createElement("div", {
+    className: "recap-story"
+  }, story), /*#__PURE__*/React.createElement("div", {
+    className: "recap-nums"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "recap-num"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "n"
+  }, week.s), /*#__PURE__*/React.createElement("div", {
+    className: "l"
+  }, "Sessions")), /*#__PURE__*/React.createElement("div", {
+    className: "recap-num"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "n"
+  }, week.mi.toFixed(1)), /*#__PURE__*/React.createElement("div", {
+    className: "l"
+  }, "Miles")), /*#__PURE__*/React.createElement("div", {
+    className: "recap-num"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "n"
+  }, week.mn), /*#__PURE__*/React.createElement("div", {
+    className: "l"
+  }, "Minutes")))), /*#__PURE__*/React.createElement("div", {
+    className: "card fu2 section-gap-sm"
   }, /*#__PURE__*/React.createElement("div", {
     className: "eyebrow",
     style: {
       marginBottom: 12
     }
-  }, "Recovery score · last 7 check-ins"), recovery == null ? /*#__PURE__*/React.createElement("div", {
+  }, "Recovery · last 7 check-ins"), recovery == null ? /*#__PURE__*/React.createElement("div", {
     className: "muted",
     style: {
       fontSize: 13
     }
-  }, "Log a couple of post-workout check-ins and your recovery score appears here.") : /*#__PURE__*/React.createElement("div", {
+  }, "Log a couple of post-workout check-ins and your recovery score appears here.") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "recov-ring-wrap"
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -6851,110 +6812,92 @@ function ProgressScreen({
       color: C.textSecondary,
       lineHeight: 1.55
     }
-  }, recovery >= 70 ? "You're well recovered — a good window to push intensity." : recovery >= 45 ? "Moderately recovered. Keep effort honest but don't overreach." : "Recovery's low. Lean into easy sessions and sleep this week."))), /*#__PURE__*/React.createElement("div", {
-    className: "card fu4 section-gap-sm"
+  }, recovery >= 70 ? "You're well recovered, a good window to push intensity." : recovery >= 45 ? "Moderately recovered. Keep effort honest but don't overreach." : "Recovery's low. Lean into easy sessions and sleep this week.")), recovery < 45 && /*#__PURE__*/React.createElement("button", {
+    className: "btn-soft",
+    style: {
+      marginTop: 12
+    },
+    onClick: () => {
+      haptic();
+      onGoEasy && onGoEasy();
+    }
+  }, "Go easy today →"))), /*#__PURE__*/React.createElement(RunnerStats, {
+    C: C,
+    profile: profile,
+    checkins: cks
+  }), (moodData.length > 0 || soreData.length > 0) && /*#__PURE__*/React.createElement("div", {
+    className: "card fu3 section-gap-sm"
   }, /*#__PURE__*/React.createElement("div", {
     className: "eyebrow",
     style: {
       marginBottom: 12
     }
-  }, "Mood trend · from your check-ins"), moodData.length === 0 ? /*#__PURE__*/React.createElement("div", {
-    className: "muted",
+  }, "How you're trending"), moodData.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "mono",
     style: {
-      fontSize: 13
+      fontSize: 11,
+      color: C.textMuted,
+      marginBottom: 6
     }
-  }, "Your mood after workouts will chart here once you've logged a few.") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+  }, "Mood after your last ", moodData.length), /*#__PURE__*/React.createElement("div", {
     className: "mood-chart",
     role: "img",
-    "aria-label": "Mood after your last " + moodData.length + " workouts, scale 1 to 5: " + moodData.map(m => m.v).join(", ")
+    "aria-label": "Mood after last " + moodData.length + " workouts, 1 to 5: " + moodData.map(m => m.v).join(", ")
   }, moodData.map((m, i) => /*#__PURE__*/React.createElement("div", {
     className: "mood-col",
     key: i,
     "aria-hidden": "true"
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 18
+      fontSize: 16
     }
   }, m.mood), /*#__PURE__*/React.createElement("div", {
     className: "chart-bar",
     style: {
-      width: "70%",
-      height: Math.max(8, m.v / 5 * 54) + "px",
+      width: "60%",
+      height: Math.max(6, m.v / 5 * 46) + "px",
       background: moodColor(m.v),
       borderRadius: 5,
       animationDelay: i * 0.05 + "s"
     }
-  })))), /*#__PURE__*/React.createElement("table", {
-    className: "sr-only"
-  }, /*#__PURE__*/React.createElement("caption", null, "Mood after recent workouts"), /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Session"), /*#__PURE__*/React.createElement("th", null, "Mood (1–5)"))), /*#__PURE__*/React.createElement("tbody", null, moodData.map((m, i) => /*#__PURE__*/React.createElement("tr", {
-    key: i
-  }, /*#__PURE__*/React.createElement("td", null, i + 1), /*#__PURE__*/React.createElement("td", null, m.v))))))), (() => {
-    const sore = checkins.slice(-7).map(c => ({
-      v: SORE_VAL[c.soreness] || 2,
-      s: c.soreness
-    }));
-    if (!sore.length) return null;
-    const sc = v => v >= 3 ? C.green : v >= 2 ? C.yellow : C.red;
-    return /*#__PURE__*/React.createElement("div", {
-      className: "card fu5 section-gap-sm"
-    }, /*#__PURE__*/React.createElement("div", {
-      className: "eyebrow",
-      style: {
-        marginBottom: 12
-      }
-    }, "Soreness trend · higher is fresher"), /*#__PURE__*/React.createElement("div", {
-      className: "mood-chart",
-      role: "img",
-      "aria-label": "Soreness after last " + sore.length + " workouts, 1 sore to 3 fresh: " + sore.map(x => x.v).join(", ")
-    }, sore.map((x, i) => /*#__PURE__*/React.createElement("div", {
-      className: "mood-col",
-      key: i,
-      "aria-hidden": "true"
-    }, /*#__PURE__*/React.createElement("div", {
-      className: "chart-bar",
-      style: {
-        width: "70%",
-        height: Math.max(8, x.v / 3 * 54) + "px",
-        background: sc(x.v),
-        borderRadius: 5,
-        animationDelay: i * 0.05 + "s"
-      }
-    })))), /*#__PURE__*/React.createElement("div", {
-      className: "dim mono",
-      style: {
-        fontSize: 11,
-        marginTop: 8
-      }
-    }, "Deload weeks (4, 8) exist to pull this line back up."));
-  })(), /*#__PURE__*/React.createElement("div", {
-    className: "section-gap-sm fu5"
+  }))))), soreData.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "mono",
+    style: {
+      fontSize: 11,
+      color: C.textMuted,
+      margin: "16px 0 6px"
+    }
+  }, "Soreness · higher is fresher"), /*#__PURE__*/React.createElement("div", {
+    className: "mood-chart",
+    role: "img",
+    "aria-label": "Soreness after last " + soreData.length + " workouts, 1 sore to 3 fresh: " + soreData.map(x => x.v).join(", ")
+  }, soreData.map((x, i) => /*#__PURE__*/React.createElement("div", {
+    className: "mood-col",
+    key: i,
+    "aria-hidden": "true"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "chart-bar",
+    style: {
+      width: "60%",
+      height: Math.max(6, x.v / 3 * 46) + "px",
+      background: soreColor(x.v),
+      borderRadius: 5,
+      animationDelay: i * 0.05 + "s"
+    }
+  })))), /*#__PURE__*/React.createElement("div", {
+    className: "dim mono",
+    style: {
+      fontSize: 11,
+      marginTop: 8
+    }
+  }, "Deload weeks (4, 8) exist to pull this line back up."))), /*#__PURE__*/React.createElement("div", {
+    className: "section-gap-sm fu4"
   }, /*#__PURE__*/React.createElement("div", {
     className: "eyebrow",
     style: {
       marginBottom: 14
     }
-  }, "Milestones"), /*#__PURE__*/React.createElement("div", null, [{
-    t: "First workout logged",
-    done: weekStats.total >= 1,
-    eta: "Complete"
-  }, {
-    t: "7-day streak",
-    done: streak >= 7,
-    eta: streak >= 7 ? "Complete" : `${Math.max(0, 7 - streak)} days to go`
-  }, {
-    t: "Run 10 minutes without walking",
-    done: false,
-    eta: "~ Week 5"
-  }, {
-    t: "Reach goal weight",
-    done: goalDelta <= 0,
-    eta: goalDelta <= 0 ? "Complete" : `~ ${Math.ceil(goalDelta / Math.max(0.5, 0.0075 * (profile.currentWeight || 170)))} weeks at a healthy pace`,
-    body: true
-  }, {
-    t: "Run a continuous 5K",
-    done: false,
-    eta: "~ Week 9"
-  }].filter(m => !(profile.bodyNeutral && m.body)).map((m, i) => /*#__PURE__*/React.createElement("div", {
+  }, "Milestones"), /*#__PURE__*/React.createElement("div", null, milestones.map((m, i) => /*#__PURE__*/React.createElement("div", {
     className: "mile-item",
     key: i
   }, /*#__PURE__*/React.createElement("div", {
@@ -6973,8 +6916,238 @@ function ProgressScreen({
     style: {
       color: m.done ? C.green : C.textMuted
     }
-  }, m.eta)))))));
+  }, m.eta)))))), /*#__PURE__*/React.createElement("div", {
+    className: "card fu4 section-gap-sm"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "h-sec",
+    style: {
+      fontSize: 16
+    }
+  }, "Workout history"), /*#__PURE__*/React.createElement("span", {
+    className: "mono",
+    style: {
+      fontSize: 12,
+      color: C.textMuted
+    }
+  }, cks.length, " logged")), cks.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    className: "muted",
+    style: {
+      fontSize: 13,
+      padding: "6px 0"
+    }
+  }, "Finish your first session and it shows up here. Every run, kept.") : /*#__PURE__*/React.createElement(React.Fragment, null, histRows.map((c, i) => /*#__PURE__*/React.createElement("button", {
+    className: "hist-item",
+    key: i,
+    style: {
+      width: "100%",
+      textAlign: "left",
+      background: "none",
+      border: "none",
+      padding: "10px 0",
+      cursor: "pointer"
+    },
+    onClick: () => {
+      haptic();
+      setDetail(c);
+    },
+    "aria-label": "Open " + (c.title || "Run") + " details"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "hist-ico"
+  }, /*#__PURE__*/React.createElement(Glyph, {
+    name: c.wtype === "walk" ? "walk" : "run",
+    size: 18,
+    color: C.orange
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "hist-main"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "hist-t"
+  }, c.title || "Run"), /*#__PURE__*/React.createElement("div", {
+    className: "hist-meta"
+  }, c.miles != null ? uDistN(c.miles, profile) + " " + uDistU(profile) + " · " : "", c.minutes || 0, " min", c.miles && c.minutes ? " · " + paceFromRun(c.minutes, c.miles, profile) : "", c.cals && !profile.bodyNeutral ? " · " + c.cals + " kcal" : "")), /*#__PURE__*/React.createElement("div", {
+    className: "hist-mood",
+    title: "Felt " + (c.mood || "")
+  }, c.mood || ""), /*#__PURE__*/React.createElement("div", {
+    className: "hist-date"
+  }, c.date ? c.date.slice(5).replace("-", "/") : ""))), cks.length > 8 && /*#__PURE__*/React.createElement("button", {
+    className: "btn-soft",
+    style: {
+      marginTop: 4
+    },
+    onClick: () => {
+      haptic();
+      setShowAllHist(v => !v);
+    }
+  }, showAllHist ? "Show less" : "See all " + cks.length + " sessions"))), /*#__PURE__*/React.createElement("div", {
+    className: "stat-grid fu5 section-gap-sm"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "stat-card"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "stat-n"
+  }, weekStats.total), /*#__PURE__*/React.createElement("div", {
+    className: "stat-l"
+  }, "Total workouts")), /*#__PURE__*/React.createElement("div", {
+    className: "stat-card"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "stat-n"
+  }, streak), /*#__PURE__*/React.createElement("div", {
+    className: "stat-l"
+  }, "Day streak")), !profile.bodyNeutral && /*#__PURE__*/React.createElement("div", {
+    className: "stat-card"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "stat-n"
+  }, lost > 0 ? uWt(lost, profile) : uWt(0, profile)), /*#__PURE__*/React.createElement("div", {
+    className: "stat-l"
+  }, "Weight lost"), /*#__PURE__*/React.createElement("div", {
+    className: "stat-sub",
+    style: {
+      color: C.green
+    }
+  }, goalDelta > 0 ? uWt(goalDelta, profile) + " to goal" : "Goal reached 🎉")), /*#__PURE__*/React.createElement("div", {
+    className: "stat-card"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "stat-n"
+  }, weekStats.totalMin), /*#__PURE__*/React.createElement("div", {
+    className: "stat-l"
+  }, "Total minutes"))), !profile.bodyNeutral && /*#__PURE__*/React.createElement("div", {
+    className: "card fu5 section-gap-sm"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "h-sec",
+    style: {
+      fontSize: 16
+    }
+  }, "Weight log"), /*#__PURE__*/React.createElement("span", {
+    className: "mono",
+    style: {
+      fontSize: 12,
+      color: C.textMuted
+    }
+  }, wl.length, " entries")), /*#__PURE__*/React.createElement("div", {
+    className: "chart",
+    role: "img",
+    "aria-label": "Weight log, last " + Math.min(8, wl.length) + " entries: " + wl.slice(-8).map(w => isMetric(profile) ? Math.round(w * 0.453592) : Math.round(w)).join(", ") + (isMetric(profile) ? " kilograms" : " pounds")
+  }, wl.slice(-8).map((w, i) => /*#__PURE__*/React.createElement("div", {
+    className: "chart-col",
+    key: i,
+    "aria-hidden": "true"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "chart-bar",
+    style: {
+      height: Math.max(8, (w - wMin) / (wMax - wMin) * 90) + "px",
+      background: C.orange,
+      animationDelay: i * 0.05 + "s"
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "chart-x"
+  }, isMetric(profile) ? Math.round(w * 0.453592) : w)))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 9,
+      marginTop: 14
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    className: "ob-input",
+    style: {
+      fontSize: 15,
+      padding: 12,
+      flex: 1
+    },
+    inputMode: "numeric",
+    placeholder: "Log today's weight (" + (isMetric(profile) ? "kg" : "lbs") + ")",
+    value: wInput,
+    onChange: e => setWInput(e.target.value.replace(/[^0-9.]/g, ""))
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "ctrl-finish",
+    style: {
+      flex: "none",
+      padding: "0 22px"
+    },
+    onClick: () => {
+      const v = parseFloat(wInput);
+      if (v > 0) {
+        addWeight(isMetric(profile) ? +(v / 0.453592).toFixed(1) : v);
+        setWInput("");
+      }
+    }
+  }, "+ Add"))), /*#__PURE__*/React.createElement(Sheet, {
+    open: !!detail,
+    onClose: () => setDetail(null),
+    label: "Session detail"
+  }, detail && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "sheet-title"
+  }, detail.title || "Run"), /*#__PURE__*/React.createElement("div", {
+    className: "sheet-sub"
+  }, detail.date || "", detail.wtype ? " · " + detail.wtype : ""), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
+      gap: 10,
+      margin: "8px 0 4px"
+    }
+  }, [["Distance", detail.miles != null ? uDistN(detail.miles, profile) + " " + uDistU(profile) : "—"], ["Time", (detail.minutes || 0) + " min"], ["Pace", detail.miles && detail.minutes ? paceFromRun(detail.minutes, detail.miles, profile) : "—"], ["Mood", detail.mood || "—"], ["Soreness after", detail.soreness || "—"], ["Energy", detail.energy || "—"]].filter(r => !(profile.bodyNeutral && r[0] === "Calories")).map(([l, v]) => /*#__PURE__*/React.createElement("div", {
+    key: l,
+    style: {
+      background: C.cardAlt,
+      borderRadius: 12,
+      padding: "12px 14px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Space Grotesk',sans-serif",
+      fontWeight: 700,
+      fontSize: 18,
+      color: C.textPrimary
+    }
+  }, v), /*#__PURE__*/React.createElement("div", {
+    className: "mono",
+    style: {
+      fontSize: 10,
+      color: C.textMuted,
+      textTransform: "uppercase",
+      letterSpacing: ".06em",
+      marginTop: 2
+    }
+  }, l))), !profile.bodyNeutral && detail.cals != null && /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: C.cardAlt,
+      borderRadius: 12,
+      padding: "12px 14px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Space Grotesk',sans-serif",
+      fontWeight: 700,
+      fontSize: 18,
+      color: C.textPrimary
+    }
+  }, detail.cals, " kcal"), /*#__PURE__*/React.createElement("div", {
+    className: "mono",
+    style: {
+      fontSize: 10,
+      color: C.textMuted,
+      textTransform: "uppercase",
+      letterSpacing: ".06em",
+      marginTop: 2
+    }
+  }, "Energy burn"))), /*#__PURE__*/React.createElement("button", {
+    className: "btn-soft",
+    onClick: () => setDetail(null)
+  }, "Close"))));
 }
+
 
 /* ============================================================
    PROFILE SCREEN
@@ -6993,26 +7166,36 @@ function ProfileScreen({
   setSimplified,
   onReset,
   onExport,
-  onImport
+  onImport,
+  checkins
 }) {
   const [editing, setEditing] = useState(null);
   const [val, setVal] = useState("");
   const [showMetrics, setShowMetrics] = useState(false);
   const [showHow, setShowHow] = useState(false);
+  const [showHealth, setShowHealth] = useState(false);
   const fileRef = useRef(null);
   const hIn = profile.height || 66;
   const bmi = (profile.currentWeight || 170) / (hIn * hIn) * 703;
-  const bmiCat = bmi < 18.5 ? "Underweight" : bmi < 25 ? "Healthy" : bmi < 30 ? "Overweight" : "Above range";
+  const band = bmiBand(bmi);
   const bmiKnob = Math.min(96, Math.max(4, (bmi - 15) / (35 - 15) * 100));
   const healthyLo = Math.round(18.5 * hIn * hIn / 703),
     healthyHi = Math.round(24.9 * hIn * hIn / 703);
   const hLabel = isMetric(profile) ? Math.round(hIn * 2.54) + " cm" : Math.floor(hIn / 12) + "'" + hIn % 12 + '"';
   const rangeLabel = isMetric(profile) ? Math.round(healthyLo * 0.453592) + "–" + Math.round(healthyHi * 0.453592) + " kg" : healthyLo + "–" + healthyHi + " lbs";
-  // #26 identity leads
   const sd = profile.startDate ? new Date(profile.startDate + "T00:00:00") : new Date();
   const memberSince = MONTHS[sd.getMonth()] + " " + sd.getFullYear();
   const planName = PLAN_VARIANTS[abilityToPlan(profile.runningAbility || "")].name;
   const initial = (profile.name || "C").trim().slice(0, 1).toUpperCase();
+  const stats = useMemo(() => {
+    const cks = checkins || [];
+    return {
+      sessions,
+      streak,
+      maxMinutes: cks.reduce((m, c) => Math.max(m, c.minutes || 0), 0),
+      maxMiles: cks.reduce((m, c) => Math.max(m, c.miles || 0), 0)
+    };
+  }, [checkins, sessions, streak]);
   const startEdit = (field, cur) => {
     setEditing(field);
     setVal(cur == null ? "" : String(cur));
@@ -7021,9 +7204,17 @@ function ProfileScreen({
     let v = val;
     if (editing === "currentWeight" || editing === "goalWeight") {
       const n = parseFloat(val);
-      v = isNaN(n) ? profile[editing] : isMetric(profile) ? +(n / 0.453592).toFixed(1) : n;
+      const lbs = isNaN(n) ? NaN : isMetric(profile) ? n / 0.453592 : n;
+      if (isNaN(lbs) || lbs < 50 || lbs > 700) {
+        setEditing(null);
+        return;
+      } // reject absurd values
+      v = +lbs.toFixed(1);
     } else if (editing === "maxSpeed") {
-      v = parseFloat(val) || null;
+      const n = parseFloat(val);
+      v = isNaN(n) ? null : Math.max(1, Math.min(16, n));
+    } else if (editing === "name") {
+      v = (val || "").slice(0, 24);
     }
     onUpdate({
       ...profile,
@@ -7031,8 +7222,24 @@ function ProfileScreen({
     });
     setEditing(null);
   };
-  const goalsDisplay = Array.isArray(profile.mainGoal) ? profile.mainGoal.join(", ") || "—" : profile.mainGoal || "—";
-  const rows = [{
+  const goals = Array.isArray(profile.mainGoal) ? profile.mainGoal : profile.mainGoal ? [profile.mainGoal] : [];
+  const toggleGoal = o => {
+    const has = goals.includes(o);
+    const next = has ? goals.filter(x => x !== o) : goals.length < 3 ? [...goals, o] : goals;
+    onUpdate({
+      ...profile,
+      mainGoal: next
+    });
+  };
+  const setDays = n => onUpdate({
+    ...profile,
+    daysPerWeek: n
+  });
+  const setLen = n => onUpdate({
+    ...profile,
+    timeAvailable: n
+  });
+  const idRows = [{
     field: "name",
     label: "Name",
     value: profile.name,
@@ -7059,41 +7266,52 @@ function ProfileScreen({
     label: "Running level",
     value: profile.runningAbility || "—",
     editable: false
+  }, {
+    field: "maxSpeed",
+    label: "Treadmill top speed",
+    value: profile.maxSpeed ? profile.maxSpeed + " mph" : "Not set",
+    editable: true
   }].filter(r => !(profile.bodyNeutral && r.body));
-  if (profile.runDuration && profile.runningAbility !== "Can't run yet") rows.push({
+  if (profile.runDuration && profile.runningAbility !== "Can't run yet") idRows.splice(5, 0, {
     field: "runDuration",
     label: "Can run for",
     value: profile.runDuration,
     editable: false
   });
-  rows.push({
-    field: "maxSpeed",
-    label: "Treadmill top speed",
-    value: profile.maxSpeed ? profile.maxSpeed + " mph" : "Not set",
-    editable: true
-  });
-  rows.push({
-    field: "mainGoal",
-    label: "Goals",
-    value: goalsDisplay,
-    editable: false
-  }, {
-    field: "timeAvailable",
-    label: "Session length",
-    value: (profile.timeAvailable || 30) + " min",
-    editable: false
-  }, {
-    field: "daysPerWeek",
-    label: "Days / week",
-    value: (profile.daysPerWeek || "—") + "",
-    editable: false
-  });
-  if (profile.cyclePhase && profile.cyclePhase !== "Not sure") rows.push({
+  if (profile.cyclePhase && profile.cyclePhase !== "Not sure") idRows.push({
     field: "cyclePhase",
     label: "Cycle phase",
     value: profile.cyclePhase,
     editable: false
   });
+  const Toggle = ({
+    on,
+    onClick,
+    id
+  }) => /*#__PURE__*/React.createElement("button", {
+    className: "toggle " + (on ? "on" : ""),
+    role: "switch",
+    "aria-checked": on,
+    "aria-labelledby": id,
+    onClick: onClick
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "toggle-knob"
+  }));
+  const chip = (active, label, onClick, key) => /*#__PURE__*/React.createElement("button", {
+    key: key,
+    onClick: () => {
+      haptic();
+      onClick();
+    },
+    style: {
+      padding: "8px 12px",
+      borderRadius: 11,
+      fontSize: 12.5,
+      border: "1.5px solid " + (active ? C.orange : C.border),
+      background: active ? C.orange + "14" : C.card,
+      color: active ? C.orange : C.textPrimary
+    }
+  }, label);
   return /*#__PURE__*/React.createElement("div", {
     className: "scroll"
   }, /*#__PURE__*/React.createElement("div", {
@@ -7134,7 +7352,49 @@ function ProfileScreen({
     }
   }, "/12")), /*#__PURE__*/React.createElement("div", {
     className: "id-sl"
-  }, "Week")))), !profile.bodyNeutral && /*#__PURE__*/React.createElement("div", {
+  }, "Week")))), /*#__PURE__*/React.createElement("div", {
+    className: "card fu2 section-gap-sm"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "h-sec",
+    style: {
+      fontSize: 16
+    }
+  }, "Achievements"), /*#__PURE__*/React.createElement("span", {
+    className: "mono",
+    style: {
+      fontSize: 12,
+      color: C.textMuted
+    }
+  }, (badges || []).length, "/", ACHIEVEMENTS.length)), /*#__PURE__*/React.createElement("div", {
+    className: "badge-grid"
+  }, ACHIEVEMENTS.map(a => {
+    const on = (badges || []).includes(a.id);
+    const prog = on ? null : badgeProgress(a, stats);
+    return /*#__PURE__*/React.createElement("div", {
+      key: a.id,
+      className: "badge " + (on ? "" : "locked"),
+      title: a.desc
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "be"
+    }, on ? a.icon : "🔒"), /*#__PURE__*/React.createElement("div", {
+      className: "bt"
+    }, a.title), prog && /*#__PURE__*/React.createElement("div", {
+      className: "mono",
+      style: {
+        fontSize: 8.5,
+        color: C.textMuted,
+        marginTop: 2,
+        letterSpacing: ".02em"
+      }
+    }, prog));
+  }))), !profile.bodyNeutral && /*#__PURE__*/React.createElement("div", {
     className: "section-gap-sm fu2"
   }, !showMetrics ? /*#__PURE__*/React.createElement("button", {
     className: "metrics-toggle",
@@ -7169,10 +7429,10 @@ function ProfileScreen({
     className: "mono",
     style: {
       fontSize: 12,
-      color: C.textMuted,
-      letterSpacing: ".08em"
+      color: C[band.ck],
+      letterSpacing: ".04em"
     }
-  }, bmiCat.toUpperCase()), /*#__PURE__*/React.createElement("div", {
+  }, band.label), /*#__PURE__*/React.createElement("div", {
     className: "bmi-track"
   }, /*#__PURE__*/React.createElement("div", {
     className: "bmi-knob",
@@ -7194,48 +7454,15 @@ function ProfileScreen({
       marginTop: 10,
       lineHeight: 1.5
     }
-  }, "BMI is a rough screen, not a verdict — it ignores muscle and build. Your consistency matters more."))), /*#__PURE__*/React.createElement("div", {
+  }, "BMI is a rough screen, not a verdict. It ignores muscle and build. Your consistency matters more."))), /*#__PURE__*/React.createElement("div", {
     className: "card fu3 section-gap-sm"
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      marginBottom: 12
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "h-sec",
-    style: {
-      fontSize: 16
-    }
-  }, "Achievements"), /*#__PURE__*/React.createElement("span", {
-    className: "mono",
-    style: {
-      fontSize: 12,
-      color: C.textMuted
-    }
-  }, (badges || []).length, "/", ACHIEVEMENTS.length)), /*#__PURE__*/React.createElement("div", {
-    className: "badge-grid"
-  }, ACHIEVEMENTS.map(a => {
-    const on = (badges || []).includes(a.id);
-    return /*#__PURE__*/React.createElement("div", {
-      key: a.id,
-      className: "badge " + (on ? "" : "locked"),
-      title: a.desc
-    }, /*#__PURE__*/React.createElement("div", {
-      className: "be"
-    }, on ? a.icon : "🔒"), /*#__PURE__*/React.createElement("div", {
-      className: "bt"
-    }, a.title));
-  }))), /*#__PURE__*/React.createElement("div", {
-    className: "card fu4 section-gap-sm"
   }, /*#__PURE__*/React.createElement("div", {
     className: "h-sec",
     style: {
       fontSize: 16,
       marginBottom: 4
     }
-  }, "Your details"), rows.map(r => /*#__PURE__*/React.createElement(React.Fragment, {
+  }, "Your details"), idRows.map(r => /*#__PURE__*/React.createElement(React.Fragment, {
     key: r.field
   }, /*#__PURE__*/React.createElement("div", {
     className: "prof-row"
@@ -7269,94 +7496,126 @@ function ProfileScreen({
     className: "h-sec",
     style: {
       fontSize: 16,
+      marginBottom: 2
+    }
+  }, "Coaching"), /*#__PURE__*/React.createElement("div", {
+    className: "muted",
+    style: {
+      fontSize: 12,
+      marginBottom: 12,
+      lineHeight: 1.5
+    }
+  }, "Change any of these and your 12-week plan rebuilds around it."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "12px 0",
+      borderBottom: "1px solid " + C.borderSoft
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "prof-lab",
+    style: {
+      marginBottom: 9
+    }
+  }, "Training focus"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 7,
+      flexWrap: "wrap"
+    }
+  }, [["run", "🏃 Running only"], ["mixed", "🏃 + 💪 Balanced"], ["strength", "💪 Strength focus"]].map(o => chip((profile.trainingMix || "run") === o[0], o[1], () => onUpdate({
+    ...profile,
+    trainingMix: o[0]
+  }), o[0])))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "12px 0",
+      borderBottom: "1px solid " + C.borderSoft
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "prof-lab",
+    style: {
+      marginBottom: 9
+    }
+  }, "Goals ", /*#__PURE__*/React.createElement("span", {
+    className: "dim",
+    style: {
+      fontSize: 11
+    }
+  }, "· up to 3")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 7,
+      flexWrap: "wrap"
+    }
+  }, [["Lose weight", "⚖️"], ["Build endurance", "🫁"], ["Feel healthier", "🌱"], ["Reduce stress", "🧘"]].map(o => chip(goals.includes(o[0]), o[1] + " " + o[0], () => toggleGoal(o[0]), o[0])))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "12px 0",
+      borderBottom: "1px solid " + C.borderSoft
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "prof-lab",
+    style: {
+      marginBottom: 9
+    }
+  }, "Days per week"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 7,
+      flexWrap: "wrap"
+    }
+  }, [2, 3, 4, 5, 6].map(n => chip((profile.daysPerWeek || 4) === n, n + "", () => setDays(n), n)))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "12px 0"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "prof-lab",
+    style: {
+      marginBottom: 9
+    }
+  }, "Session length"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 7,
+      flexWrap: "wrap"
+    }
+  }, [15, 20, 30, 45, 60].map(n => chip((profile.timeAvailable || 30) === n, n + " min", () => setLen(n), n))))), /*#__PURE__*/React.createElement("div", {
+    className: "card fu4 section-gap-sm"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "h-sec",
+    style: {
+      fontSize: 16,
       marginBottom: 4
     }
-  }, "Settings"), /*#__PURE__*/React.createElement("div", {
-  style: {
-    padding: "14px 0",
-    borderBottom: "1px solid " + C.borderSoft
-  }
-}, /*#__PURE__*/React.createElement("div", {
-  className: "prof-lab",
-  style: {
-    marginBottom: 9
-  }
-}, "Training focus"), /*#__PURE__*/React.createElement("div", {
-  style: {
-    display: "flex",
-    gap: 7,
-    flexWrap: "wrap"
-  }
-}, [["run", "🏃 Running only"], ["mixed", "🏃 + 💪 Balanced"], ["strength", "💪 Strength focus"]].map(o => {
-  const on = (profile.trainingMix || "run") === o[0];
-  return /*#__PURE__*/React.createElement("button", {
-    key: o[0],
-    onClick: () => {
-      haptic();
-      onUpdate({
-        ...profile,
-        trainingMix: o[0]
-      });
-    },
-    style: {
-      padding: "8px 12px",
-      borderRadius: 11,
-      fontSize: 12.5,
-      border: "1.5px solid " + (on ? C.orange : C.border),
-      background: on ? C.orange + "14" : C.card,
-      color: on ? C.orange : C.textPrimary
-    }
-  }, o[1]);
-})), /*#__PURE__*/React.createElement("div", {
-  className: "mono",
-  style: {
-    fontSize: 10.5,
-    color: C.textMuted,
-    marginTop: 9,
-    lineHeight: 1.5
-  }
-}, "Blends bodyweight strength days into your week. Change it anytime and your plan rebuilds around it.")), /*#__PURE__*/React.createElement("div", {
+  }, "Display & comfort"), /*#__PURE__*/React.createElement("div", {
     className: "prof-row"
   }, /*#__PURE__*/React.createElement("div", {
     className: "prof-lab",
     id: "lbl-theme"
-  }, "Light theme"), /*#__PURE__*/React.createElement("button", {
-    className: "toggle " + (theme === "light" ? "on" : ""),
-    role: "switch",
-    "aria-checked": theme === "light",
-    "aria-labelledby": "lbl-theme",
+  }, "Light theme"), /*#__PURE__*/React.createElement(Toggle, {
+    on: theme === "light",
+    id: "lbl-theme",
     onClick: () => {
       haptic();
       setTheme(theme === "dark" ? "light" : "dark");
     }
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "toggle-knob"
-  }))), /*#__PURE__*/React.createElement("div", {
+  })), /*#__PURE__*/React.createElement("div", {
     className: "prof-row"
   }, /*#__PURE__*/React.createElement("div", {
     className: "prof-lab",
     id: "lbl-text"
-  }, "Larger text"), /*#__PURE__*/React.createElement("button", {
-    className: "toggle " + (simplified ? "on" : ""),
-    role: "switch",
-    "aria-checked": simplified,
-    "aria-labelledby": "lbl-text",
+  }, "Larger text"), /*#__PURE__*/React.createElement(Toggle, {
+    on: simplified,
+    id: "lbl-text",
     onClick: () => {
       haptic();
       setSimplified(!simplified);
     }
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "toggle-knob"
-  }))), /*#__PURE__*/React.createElement("div", {
+  })), /*#__PURE__*/React.createElement("div", {
     className: "prof-row"
   }, /*#__PURE__*/React.createElement("div", {
     className: "prof-lab",
     id: "lbl-units"
-  }, "Metric units (km · kg)"), /*#__PURE__*/React.createElement("button", {
-    className: "toggle " + (profile.units === "metric" ? "on" : ""),
-    role: "switch",
-    "aria-checked": profile.units === "metric",
-    "aria-labelledby": "lbl-units",
+  }, "Metric units (km · kg)"), /*#__PURE__*/React.createElement(Toggle, {
+    on: profile.units === "metric",
+    id: "lbl-units",
     onClick: () => {
       haptic();
       onUpdate({
@@ -7364,9 +7623,7 @@ function ProfileScreen({
         units: profile.units === "metric" ? "imperial" : "metric"
       });
     }
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "toggle-knob"
-  }))), /*#__PURE__*/React.createElement("div", {
+  })), /*#__PURE__*/React.createElement("div", {
     className: "prof-row"
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     className: "prof-lab",
@@ -7377,11 +7634,9 @@ function ProfileScreen({
       fontSize: 11,
       marginTop: 2
     }
-  }, "Neutral greetings, Meal 1/2/3")), /*#__PURE__*/React.createElement("button", {
-    className: "toggle " + (profile.shiftMode ? "on" : ""),
-    role: "switch",
-    "aria-checked": !!profile.shiftMode,
-    "aria-labelledby": "lbl-shift",
+  }, "Neutral greetings, Meal 1/2/3")), /*#__PURE__*/React.createElement(Toggle, {
+    on: !!profile.shiftMode,
+    id: "lbl-shift",
     onClick: () => {
       haptic();
       onUpdate({
@@ -7389,9 +7644,7 @@ function ProfileScreen({
         shiftMode: !profile.shiftMode
       });
     }
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "toggle-knob"
-  }))), /*#__PURE__*/React.createElement("div", {
+  })), /*#__PURE__*/React.createElement("div", {
     className: "prof-row"
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     className: "prof-lab",
@@ -7402,11 +7655,9 @@ function ProfileScreen({
       fontSize: 11,
       marginTop: 2
     }
-  }, "Hides weight, BMI & calories")), /*#__PURE__*/React.createElement("button", {
-    className: "toggle " + (profile.bodyNeutral ? "on" : ""),
-    role: "switch",
-    "aria-checked": !!profile.bodyNeutral,
-    "aria-labelledby": "lbl-bn",
+  }, "Hides weight, BMI & calories")), /*#__PURE__*/React.createElement(Toggle, {
+    on: !!profile.bodyNeutral,
+    id: "lbl-bn",
     onClick: () => {
       haptic();
       onUpdate({
@@ -7414,67 +7665,36 @@ function ProfileScreen({
         bodyNeutral: !profile.bodyNeutral
       });
     }
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "toggle-knob"
-  }))), /*#__PURE__*/React.createElement("button", {
-    className: "prof-row",
-    style: {
-      width: "100%",
-      textAlign: "left"
-    },
-    onClick: () => {
-      haptic();
-      setShowHow(true);
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "prof-lab"
-  }, "How CoachMile works"), /*#__PURE__*/React.createElement("div", {
-    className: "prof-val dim"
-  }, "›")), /*#__PURE__*/React.createElement("div", {
-  className: "prof-row"
-}, /*#__PURE__*/React.createElement("div", {
-  className: "prof-lab"
-}, "Language"), /*#__PURE__*/React.createElement("div", {
-  style: {
-    display: "flex",
-    gap: 7
-  }
-}, ["en", "es"].map(function (l) {
-  var on = function () {
-    try {
-      return (localStorage.getItem('coachmile_lang') || 'en') === l;
-    } catch (e) {
-      return l === 'en';
-    }
-  }();
-  return /*#__PURE__*/React.createElement("button", {
-    key: l,
-    onClick: function () {
-      try {
-        localStorage.setItem('coachmile_lang', l);
-      } catch (e) {}
-      location.reload();
-    },
-    style: {
-      padding: "7px 14px",
-      borderRadius: 10,
-      fontSize: 12.5,
-      fontWeight: 600,
-      border: "1.5px solid " + (on ? C.orange : C.border),
-      background: on ? C.orange + "14" : C.card,
-      color: on ? C.orange : C.textPrimary
-    }
-  }, l === 'en' ? 'EN' : 'ES');
-}))), /*#__PURE__*/React.createElement("div", {
+  })), /*#__PURE__*/React.createElement("div", {
     className: "prof-row"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "prof-lab dim"
-  }, "Version"), /*#__PURE__*/React.createElement("div", {
-    className: "prof-val dim mono",
+    className: "prof-lab"
+  }, "Language"), /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 13
+      display: "flex",
+      gap: 7
     }
-  }, "CoachMile ", APP_VERSION))), /*#__PURE__*/React.createElement("div", {
+  }, ["en", "es"].map(l => {
+    const on = (typeof localStorage !== "undefined" ? localStorage.getItem('coachmile_lang') || 'en' : 'en') === l;
+    return /*#__PURE__*/React.createElement("button", {
+      key: l,
+      onClick: () => {
+        try {
+          localStorage.setItem('coachmile_lang', l);
+        } catch (e) {}
+        location.reload();
+      },
+      style: {
+        padding: "7px 14px",
+        borderRadius: 10,
+        fontSize: 12.5,
+        fontWeight: 600,
+        border: "1.5px solid " + (on ? C.orange : C.border),
+        background: on ? C.orange + "14" : C.card,
+        color: on ? C.orange : C.textPrimary
+      }
+    }, l === 'en' ? 'EN' : 'ES');
+  })))), /*#__PURE__*/React.createElement("div", {
     className: "card fu4 section-gap-sm"
   }, /*#__PURE__*/React.createElement("div", {
     className: "h-sec",
@@ -7482,14 +7702,14 @@ function ProfileScreen({
       fontSize: 16,
       marginBottom: 4
     }
-  }, "Your data"), /*#__PURE__*/React.createElement("div", {
+  }, "Data & privacy"), /*#__PURE__*/React.createElement("div", {
     className: "muted",
     style: {
       fontSize: 12.5,
       marginBottom: 12,
       lineHeight: 1.5
     }
-  }, "Everything is stored on this device. Back it up so you don't lose your history if you clear your browser or switch phones."), /*#__PURE__*/React.createElement("div", {
+  }, "Everything lives on this device. No account, no server, no tracking. Back it up so a cleared browser or a new phone can't erase your history."), /*#__PURE__*/React.createElement("div", {
     className: "data-row"
   }, /*#__PURE__*/React.createElement("button", {
     className: "data-btn",
@@ -7507,7 +7727,45 @@ function ProfileScreen({
     onChange: e => {
       if (e.target.files && e.target.files[0]) onImport(e.target.files[0]);
     }
-  })), /*#__PURE__*/React.createElement("button", {
+  }), /*#__PURE__*/React.createElement("button", {
+    className: "prof-row",
+    style: {
+      width: "100%",
+      textAlign: "left",
+      marginTop: 4
+    },
+    onClick: () => {
+      haptic();
+      setShowHealth(true);
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "prof-lab"
+  }, "Health changed? Quick re-check"), /*#__PURE__*/React.createElement("div", {
+    className: "prof-val dim"
+  }, "›")), /*#__PURE__*/React.createElement("button", {
+    className: "prof-row",
+    style: {
+      width: "100%",
+      textAlign: "left"
+    },
+    onClick: () => {
+      haptic();
+      setShowHow(true);
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "prof-lab"
+  }, "How CoachMile works"), /*#__PURE__*/React.createElement("div", {
+    className: "prof-val dim"
+  }, "›")), /*#__PURE__*/React.createElement("div", {
+    className: "prof-row"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "prof-lab dim"
+  }, "Version"), /*#__PURE__*/React.createElement("div", {
+    className: "prof-val dim mono",
+    style: {
+      fontSize: 13
+    }
+  }, "CoachMile ", APP_VERSION))), /*#__PURE__*/React.createElement("button", {
     className: "btn-danger fu5 section-gap-sm",
     onClick: () => {
       if (confirm("Reset everything? This clears your profile, check-ins, and progress.")) onReset();
@@ -7516,25 +7774,47 @@ function ProfileScreen({
     style: {
       height: 8
     }
-  }), showHow && /*#__PURE__*/React.createElement("div", {
-    className: "sheet-scrim",
-    onClick: () => setShowHow(false),
+  }), /*#__PURE__*/React.createElement(Sheet, {
+    open: showHealth,
+    onClose: () => setShowHealth(false),
+    label: "Health re-check"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "sheet-title"
+  }, "A quick health re-check"), /*#__PURE__*/React.createElement("div", {
     style: {
-      alignItems: "center"
+      fontSize: 13.5,
+      color: C.textSecondary,
+      lineHeight: 1.65,
+      marginTop: 6
     }
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "sheet",
-    role: "dialog",
-    "aria-label": "How CoachMile works",
+  }, /*#__PURE__*/React.createElement("p", {
     style: {
-      maxHeight: "82vh",
-      overflowY: "auto",
-      borderRadius: 22
+      marginBottom: 12
+    }
+  }, "Bodies change over a 12-week block. Since you started, have you noticed any new chest pain, dizziness, breathlessness at rest, a joint or bone issue that running affects, or a change in medication?"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      marginBottom: 0
+    }
+  }, "If yes to any, it's worth a word with your doctor before pushing intensity. Either way, you can always lean on the easy sessions, the plan holds.")), /*#__PURE__*/React.createElement("button", {
+    className: "btn-primary",
+    style: {
+      marginTop: 16
     },
-    onClick: e => e.stopPropagation()
+    onClick: () => setShowHealth(false)
+  }, "Got it"), /*#__PURE__*/React.createElement("button", {
+    className: "btn-soft",
+    onClick: () => {
+      onUpdate({
+        ...profile,
+        healthCaution: true
+      });
+      setShowHealth(false);
+    }
+  }, "Something's changed, keep me gentle")), /*#__PURE__*/React.createElement(Sheet, {
+    open: showHow,
+    onClose: () => setShowHow(false),
+    label: "How CoachMile works"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "sheet-grip"
-  }), /*#__PURE__*/React.createElement("div", {
     className: "sheet-title"
   }, "How CoachMile works"), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -7551,7 +7831,7 @@ function ProfileScreen({
     style: {
       color: C.textPrimary
     }
-  }, "Your plan."), " From your answers we pick one of three variants (zero-to-running, C25K, or endurance) and build a real 12-week program — Foundation, Build, and Peak blocks, with deload weeks so your body absorbs the work, ending in a graduation 5K."), /*#__PURE__*/React.createElement("p", {
+  }, "Your plan."), " From your answers we pick one of three variants (zero-to-running, C25K, or endurance) and build a real 12-week program, with Foundation, Build, and Peak blocks and deload weeks, ending in a graduation 5K."), /*#__PURE__*/React.createElement("p", {
     style: {
       marginBottom: 12
     }
@@ -7571,7 +7851,7 @@ function ProfileScreen({
     style: {
       color: C.textPrimary
     }
-  }, "Your PAR-Q answers are never saved"), " — they live only on that screen."), /*#__PURE__*/React.createElement("p", {
+  }, "Your PAR-Q answers are never saved"), ", they live only on that screen."), /*#__PURE__*/React.createElement("p", {
     style: {
       marginBottom: 0
     }
@@ -7579,14 +7859,15 @@ function ProfileScreen({
     style: {
       color: C.textPrimary
     }
-  }, "Your privacy."), " Everything stays on this device — no account, no server, no tracking. Export a backup anytime; it's yours.")), /*#__PURE__*/React.createElement("button", {
+  }, "Your privacy."), " Everything stays on this device, no account, no server, no tracking. Export a backup anytime, it's yours.")), /*#__PURE__*/React.createElement("button", {
     className: "btn-primary",
     style: {
-      marginTop: 18
+      marginTop: 16
     },
     onClick: () => setShowHow(false)
-  }, "Got it"))));
+  }, "Got it")));
 }
+
 
 /* ============================================================
    ACHIEVEMENT OVERLAY
@@ -8107,9 +8388,26 @@ function App() {
     r.onload = () => {
       try {
         const obj = JSON.parse(r.result);
+        // #PY guard: only apply a genuine CoachMile backup, with per-key type sanity
+        if (!obj || typeof obj !== "object" || Array.isArray(obj) || obj._app !== "CoachMile") {
+          alert("That file isn't a CoachMile backup, so nothing was changed.");
+          return;
+        }
+        const arrKeys = [K.checkins, K.weight, K.events, K.badges, K.energylog];
+        const objKeys = [K.profile, K.daily, K.swaps, K.water, K.last, K.active];
+        let applied = 0;
         Object.values(K).forEach(k => {
-          if (obj[k] != null) LS.set(k, obj[k]);
+          const v = obj[k];
+          if (v == null) return;
+          if (arrKeys.indexOf(k) >= 0 && !Array.isArray(v)) return;
+          if (objKeys.indexOf(k) >= 0 && (typeof v !== "object" || Array.isArray(v))) return;
+          LS.set(k, v);
+          applied++;
         });
+        if (!applied) {
+          alert("That backup didn't contain any CoachMile data to restore.");
+          return;
+        }
         track("import");
         location.reload();
       } catch (e) {
@@ -8184,7 +8482,12 @@ function App() {
     weightLog: weightLog,
     addWeight: addWeight,
     weekStats: weekStats,
-    streak: streak
+    streak: streak,
+    onUpdate: updateProfile,
+    onGoEasy: () => {
+      setEnergy("Low");
+      setScreen("today");
+    }
   })), screen === "profile" && /*#__PURE__*/React.createElement(ErrorBoundary, {
     name: "profile"
   }, /*#__PURE__*/React.createElement(ProfileScreen, {
@@ -8193,6 +8496,7 @@ function App() {
     sessions: checkins.length,
     streak: streak,
     badges: badges,
+    checkins: checkins,
     onUpdate: updateProfile,
     theme: theme,
     setTheme: setTheme,
