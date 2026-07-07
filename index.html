@@ -5348,45 +5348,20 @@ function FoodScreen({
   setWater,
   todayType
 }) {
-  const shift = !!profile.shiftMode;
-  const mealNames = shift ? {
-    breakfast: "Meal 1",
-    lunch: "Meal 2",
-    dinner: "Meal 3"
-  } : {
-    breakfast: "Breakfast",
-    lunch: "Lunch",
-    dinner: "Dinner"
-  };
-  const [meal, setMeal] = useState("breakfast");
   const habits = Array.isArray(profile.foodHabits) ? profile.foodHabits : profile.foodHabits ? [profile.foodHabits] : [];
   const dailyOz = Math.round((profile.currentWeight || 170) / 2);
   const waterGoal = Math.max(4, Math.round(dailyOz / 16.9));
   const week = computeWeek(profile);
-  const recipe = recipeFor(week, habits);
-
-  // #41 session-aware fueling
-  const sessionTip = todayType === "run" ? "Run day — a little carb 60–90 min before (banana or toast) fuels the session, and protein within an hour after helps you rebuild." : todayType === "walk" ? "Walk day — no special fueling needed. Water and a normal meal beforehand is plenty." : "Rest day — lean on protein and vegetables today. You're rebuilding, not fuelling a hard run.";
   const tipFor = () => {
-    if (energy === "Low") return "Low energy today often means your body wants a quick sugar fix. Reach for protein + water first — it steadies you longer than a snack ever will.";
+    if (energy === "Low") return "Low energy today often means your body wants a quick sugar fix. Reach for protein and water first. It steadies you longer than a snack ever will.";
     if (habits.includes("Skip breakfast")) return "You mentioned skipping breakfast. Even a small protein-forward bite within an hour of waking curbs the afternoon crash and the 3pm cravings.";
     if (habits.includes("Late-night snacking")) return "Late-night snacking is usually thirst or boredom in disguise. Try a glass of water and a 10-minute wait before the pantry.";
-    if (habits.includes("Sugary drinks")) return "Swapping one sugary drink a day for sparkling water is one of the highest-leverage changes for fat loss. Start with the easiest one.";
-    if (habits.includes("Emotional eating")) return "When the urge hits, name the feeling first. Emotional hunger is sudden and specific; real hunger builds slowly. A 5-minute pause reveals which it is.";
-    if (habits.includes("Eat out often")) return "Eating out often? Decide your order before you arrive, and ask for a side of veg instead of fries by default. Small defaults beat willpower.";
-    if (habits.includes("Big portions")) return "Big portions? Use a smaller plate and wait ten minutes before seconds — fullness lags the fork by about that long.";
-    return "Food coaching here is about behavior, not calories. One steady habit beats a perfect week you can't repeat. Pick one thing to be consistent with.";
+    if (habits.includes("Sugary drinks")) return "Swapping one sugary drink a day for sparkling water is one of the easiest wins there is. Start with the one that's simplest to drop.";
+    if (habits.includes("Emotional eating")) return "When the urge hits, name the feeling first. Emotional hunger is sudden and specific. Real hunger builds slowly. A 5-minute pause tells you which it is.";
+    if (habits.includes("Eat out often")) return "Eating out a lot? Decide your order before you arrive, and ask for a side of veg instead of fries by default. Small defaults beat willpower.";
+    if (habits.includes("Big portions")) return "Big portions? Use a smaller plate and wait ten minutes before seconds. Fullness lags the fork by about that long.";
+    return "Food here is about what you do, not counting calories. One steady habit beats a perfect week you can't repeat. Pick one thing to be consistent with.";
   };
-  const MEALS = {
-    breakfast: ["Protein source (eggs, yogurt, or a shake)", "A piece of fruit or handful of berries", "Water before coffee"],
-    lunch: ["Half the plate vegetables", "A palm of protein", "Slow down — put the fork down between bites"],
-    dinner: ["Finish eating 2–3 hrs before bed", "Watch the portion, not the food group", "Herbal tea instead of a second helping"]
-  };
-  const [checks, setChecks] = useState({});
-  const toggle = k => setChecks(c => ({
-    ...c,
-    [k]: !c[k]
-  }));
   useEffect(() => {
     track("tip_shown");
   }, []);
@@ -5402,12 +5377,6 @@ function FoodScreen({
   }, "This week's focus"), /*#__PURE__*/React.createElement("div", {
     className: "tip-txt"
   }, FOOD_FOCUS[(week - 1) % 4])), /*#__PURE__*/React.createElement("div", {
-    className: "coach fu2 section-gap-sm"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "coach-av"
-  }, "🍎"), /*#__PURE__*/React.createElement("div", {
-    className: "coach-txt"
-  }, sessionTip)), /*#__PURE__*/React.createElement("div", {
     className: "card fu2 section-gap-sm"
   }, /*#__PURE__*/React.createElement("div", {
     className: "tip-lab",
@@ -5480,102 +5449,46 @@ function FoodScreen({
     className: "h-sec",
     style: {
       fontSize: 15,
-      marginBottom: 6
+      marginBottom: 8
     }
   }, "The plate, not the scale"), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 12.5,
-      lineHeight: 1.6
+      lineHeight: 1.9
     }
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
     style: {
       color: C.green,
       fontWeight: 600
     }
-  }, "½ vegetables"), " — fill this first"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+  }, "½ vegetables"), " ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: C.textMuted
+    }
+  }, "fill this first")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
     style: {
       color: C.orange,
       fontWeight: 600
     }
-  }, "¼ protein"), " — a palm-sized portion"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+  }, "¼ protein"), " ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: C.textMuted
+    }
+  }, "a palm-sized portion")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
     style: {
       color: C.blue,
       fontWeight: 600
     }
-  }, "¼ carbs"), " — rice, potato, bread")))), /*#__PURE__*/React.createElement("div", {
-    className: "card fu4 section-gap-sm"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "eyebrow",
+  }, "¼ carbs"), " ", /*#__PURE__*/React.createElement("span", {
     style: {
-      marginBottom: 8
+      color: C.textMuted
     }
-  }, todayType === "rest" ? "Rest-day prep · one thing" : "This week's 15-minute win"), todayType === "rest" && /*#__PURE__*/React.createElement("div", {
-    className: "muted",
-    style: {
-      fontSize: 13,
-      marginBottom: 10,
-      lineHeight: 1.5
-    }
-  }, "Rest day is prep day. Batch one thing — boil six eggs, cook a pot of rice — and tomorrow's easy."), /*#__PURE__*/React.createElement("div", {
-    className: "h-sec",
-    style: {
-      fontSize: 16,
-      marginBottom: 2
-    }
-  }, recipe.name, " ", /*#__PURE__*/React.createElement("span", {
-    className: "mono",
-    style: {
-      fontSize: 12,
-      color: C.textMuted,
-      fontWeight: 400
-    }
-  }, "· ", recipe.mins, " min")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 13.5,
-      color: C.textSecondary,
-      lineHeight: 1.55,
-      marginBottom: 8
-    }
-  }, recipe.blurb), /*#__PURE__*/React.createElement("div", {
-    className: "mono",
-    style: {
-      fontSize: 11.5,
-      color: C.green
-    }
-  }, "💲 ", recipe.budget)), /*#__PURE__*/React.createElement(NutritionLibrary, {
+  }, "rice, potato, bread"))))), /*#__PURE__*/React.createElement(NutritionLibrary, {
     C: C,
     profile: profile
-  }), /*#__PURE__*/React.createElement("div", {
-    className: "card fu5 section-gap-sm"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "meal-tab"
-  }, ["breakfast", "lunch", "dinner"].map(m => /*#__PURE__*/React.createElement("button", {
-    key: m,
-    className: "meal-pill " + (meal === m ? "on" : ""),
-    onClick: () => {
-      haptic();
-      setMeal(m);
-    }
-  }, mealNames[m]))), MEALS[meal].map((x, i) => {
-    const key = meal + i;
-    const on = !!checks[key];
-    return /*#__PURE__*/React.createElement("div", {
-      key: key,
-      className: "check-item " + (on ? "done" : ""),
-      role: "checkbox",
-      "aria-checked": on,
-      tabIndex: 0,
-      onClick: () => toggle(key),
-      onKeyDown: e => {
-        if (e.key === "Enter" || e.key === " ") toggle(key);
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      className: "check-box " + (on ? "on" : "")
-    }, on ? "✓" : ""), /*#__PURE__*/React.createElement("div", {
-      className: "check-lab"
-    }, x));
-  })));
+  }));
 }
+
 
 /* ============================================================
    PROGRESS SCREEN
@@ -7437,6 +7350,12 @@ ReactDOM.createRoot(document.getElementById("root")).render(/*#__PURE__*/React.c
     "Achievement Unlocked":"Logro desbloqueado","Let's go":"¡Vamos!","Showed Up":"Te presentaste","First Workout":"Primer entreno","Quarter Hour":"Cuarto de hora","First Mile":"Primera milla","3-Day Streak":"Racha de 3 días","7-Day Streak":"Racha de 7 días","Ten Sessions":"Diez sesiones","5K Distance":"Distancia 5K","Graduate":"Graduado",
     // misc
     "Two quiet wins":"Dos triunfos silenciosos",
+    "½ vegetables":"½ verduras",
+    "fill this first":"llena esto primero",
+    "¼ protein":"¼ proteína",
+    "a palm-sized portion":"del tamaño de tu palma",
+    "¼ carbs":"¼ carbos",
+    "rice, potato, bread":"arroz, papa, pan",
     "Week":"Semana",
     "of":"de",
     "OF":"DE",
