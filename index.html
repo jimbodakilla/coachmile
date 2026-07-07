@@ -1174,9 +1174,32 @@ function buildWalkDay(goals, timeTarget) {
     focus
   };
 }
+/* #split — blend running with bodyweight strength based on training focus */
+function applyMix(pat, mix) {
+  if (mix !== "mixed" && mix !== "strength") return pat;
+  const out = pat.slice();
+  const runIdxs = out.map((s, i) => s === "run" ? i : -1).filter(i => i >= 0);
+  if (runIdxs.length === 0) return out;
+  const convertN = mix === "strength" ? Math.max(1, runIdxs.length - 1) : Math.max(1, Math.floor(runIdxs.length / 2));
+  // convert the LAST run days to strength (keep the early-week runs)
+  runIdxs.slice(runIdxs.length - convertN).forEach(i => out[i] = "strength");
+  return out;
+}
+function strengthCircuit(week) {
+  const rounds = week >= 9 ? 4 : 3;
+  const exercises = [
+    { name: "Bodyweight squats", detail: "12 reps" },
+    { name: "Glute bridges", detail: "15 reps" },
+    { name: "Reverse lunges", detail: "10 each leg" },
+    { name: "Push-ups", detail: "as many as good form" },
+    { name: "Calf raises", detail: "20 reps" },
+    { name: "Side plank", detail: "hold 20 sec each side" }
+  ];
+  return { rounds, exercises, mins: rounds * exercises.length + (rounds - 1) };
+}
 function weekPattern(profile, week, swaps) {
   const days = profile.daysPerWeek || 4;
-  const base = PATTERNS[Math.min(6, Math.max(2, days))] || PATTERNS[4];
+  let base = applyMix(PATTERNS[Math.min(6, Math.max(2, days))] || PATTERNS[4], profile.trainingMix);
   if (swaps && swaps[week] && Array.isArray(swaps[week]) && swaps[week].length === 7) return swaps[week];
   return base;
 }
@@ -1228,6 +1251,19 @@ function buildPlan(profile, lastCheckin, opts) {
         intervals: wi,
         totalMin: totalMinutes(wi),
         focus: w.focus
+      };
+    }
+    if (slot === "strength") {
+      const c = strengthCircuit(week);
+      return {
+        ...meta,
+        day: dow[i],
+        type: "strength",
+        title: "Bodyweight Strength",
+        intervals: [],
+        circuit: c,
+        totalMin: c.mins,
+        focus: "Runner strength — legs, glutes, core"
       };
     }
     let variant = base,
@@ -2566,7 +2602,7 @@ function TodayScreen({
     }
   }, "◎ Form focus · ", formCueFor(computeWeek(profile), todayIdx)), /*#__PURE__*/React.createElement("div", {
     className: "mission-meta"
-  }, /*#__PURE__*/React.createElement("span", null, "⏱ ", /*#__PURE__*/React.createElement("b", null, day.totalMin, " min")), isRun && /*#__PURE__*/React.createElement("span", null, "◷ ", /*#__PURE__*/React.createElement("b", null, "guided"), " walk/run"), first && /*#__PURE__*/React.createElement("span", null, "▶ start at ", /*#__PURE__*/React.createElement("b", null, uSpeed(first.speed, profile)), " · ", (first.incline || 0).toFixed(1), "%", " · ", paceStr(first.speed, profile))), isRun && goals.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("span", null, "⏱ ", /*#__PURE__*/React.createElement("b", null, day.totalMin, " min")), isRun && /*#__PURE__*/React.createElement("span", null, "◷ ", /*#__PURE__*/React.createElement("b", null, "guided"), " walk/run"), first && /*#__PURE__*/React.createElement("span", null, "▶ start at ", /*#__PURE__*/React.createElement("b", null, uSpeed(first.speed, profile)), " · ", (first.incline || 0).toFixed(1), "%", " · ", paceStr(first.speed, profile)), day.type === "strength" && day.circuit && /*#__PURE__*/React.createElement("span", null, "💪 ", /*#__PURE__*/React.createElement("b", null, day.circuit.rounds, " rounds"), " · ", day.circuit.exercises.length, " moves")), isRun && goals.length > 0 && /*#__PURE__*/React.createElement("div", {
     className: "goal-chips",
     style: {
       marginTop: 0,
@@ -2616,7 +2652,7 @@ function TodayScreen({
       haptic();
       setReadyOpen(true);
     }
-  }, day.type === "walk" ? "START WALK" : "START WORKOUT"), day.type === "run" && /*#__PURE__*/React.createElement("button", {
+  }, day.type === "strength" ? "START STRENGTH" : day.type === "walk" ? "START WALK" : "START WORKOUT"), day.type === "run" && /*#__PURE__*/React.createElement("button", {
     className: "btn-soft",
     onClick: () => {
       haptic();
@@ -2854,6 +2890,378 @@ function TodayScreen({
 /* ============================================================
    WORKOUT MODE
    ============================================================ */
+function BodyweightMode({
+  C,
+  day,
+  profile,
+  onFinish,
+  onExit
+}) {
+  const circuit = day.circuit || strengthCircuit(1);
+  const [phase, setPhase] = useState("intro");
+  const [round, setRound] = useState(1);
+  const [exIdx, setExIdx] = useState(0);
+  const [ci, setCi] = useState({
+    energy: "",
+    soreness: "",
+    mood: ""
+  });
+  const [restSecs, setRestSecs] = useState(30);
+  const restRef = useRef(null);
+  const total = circuit.rounds * circuit.exercises.length;
+  const doneCount = (round - 1) * circuit.exercises.length + exIdx;
+  const ex = circuit.exercises[exIdx];
+  const estMin = day.totalMin || circuit.mins || 20;
+  const cals = Math.round(estMin * ((profile.currentWeight || 170) * 0.00095) * 8);
+  const ciDone = ci.energy && ci.soreness && ci.mood;
+  useEffect(() => {
+    if (phase !== "rest") return;
+    setRestSecs(30);
+    restRef.current = setInterval(() => {
+      setRestSecs(s => {
+        if (s <= 1) {
+          clearInterval(restRef.current);
+          setPhase("work");
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+    return () => clearInterval(restRef.current);
+  }, [phase]);
+  const nextExercise = () => {
+    haptic();
+    if (exIdx < circuit.exercises.length - 1) {
+      setExIdx(exIdx + 1);
+      return;
+    }
+    if (round < circuit.rounds) {
+      setRound(round + 1);
+      setExIdx(0);
+      setPhase("rest");
+      return;
+    }
+    setPhase("checkin");
+  };
+  const logAndDone = () => {
+    onFinish({
+      checkin: {
+        ...ci,
+        date: todayStr()
+      },
+      minutes: estMin,
+      miles: 0,
+      elev: 0,
+      cals,
+      intervals: total,
+      title: day.title,
+      wtype: "strength",
+      planKey: day.planKey,
+      logOnly: true
+    });
+    setPhase("done");
+  };
+  if (phase === "intro") {
+    return /*#__PURE__*/React.createElement("div", {
+      className: "wk-full",
+      style: {
+        overflowY: "auto"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "wk-head"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "wk-phase-lab",
+      style: {
+        color: C.purple
+      }
+    }, "● BODYWEIGHT STRENGTH"), /*#__PURE__*/React.createElement("button", {
+      className: "wk-x",
+      "aria-label": "Exit",
+      onClick: onExit
+    }, "✕")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: "8px 24px 24px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "syne",
+      style: {
+        fontSize: 28,
+        color: C.textPrimary,
+        marginBottom: 4
+      }
+    }, day.title), /*#__PURE__*/React.createElement("div", {
+      className: "muted",
+      style: {
+        fontSize: 14,
+        marginBottom: 18
+      }
+    }, circuit.rounds, " rounds of ", circuit.exercises.length, " moves. Take it at your own pace and rest when you need to."), circuit.exercises.map((e, i) => /*#__PURE__*/React.createElement("div", {
+      key: i,
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        padding: "11px 0",
+        borderTop: i ? "1px solid " + C.borderSoft : "none"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 14,
+        color: C.textPrimary,
+        fontWeight: 500
+      }
+    }, e.name), /*#__PURE__*/React.createElement("span", {
+      className: "mono",
+      style: {
+        fontSize: 12,
+        color: C.textMuted
+      }
+    }, e.detail))), /*#__PURE__*/React.createElement("button", {
+      className: "btn-primary",
+      style: {
+        marginTop: 18
+      },
+      onClick: () => {
+        haptic();
+        setPhase("work");
+      }
+    }, "Start")));
+  }
+  if (phase === "rest") {
+    return /*#__PURE__*/React.createElement("div", {
+      className: "stretch-full"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "eyebrow",
+      style: {
+        color: C.purple
+      }
+    }, "ROUND ", round - 1, " DONE · TAKE A BREATH"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 56
+      }
+    }, "💪"), /*#__PURE__*/React.createElement("div", {
+      className: "stretch-name"
+    }, "Rest"), /*#__PURE__*/React.createElement("div", {
+      className: "stretch-desc"
+    }, "Shake it out. Round ", round, " of ", circuit.rounds, " is next."), /*#__PURE__*/React.createElement("div", {
+      className: "stretch-time",
+      style: {
+        color: C.purple
+      }
+    }, restSecs, "s"), /*#__PURE__*/React.createElement("button", {
+      className: "ctrl-finish",
+      style: {
+        maxWidth: 260
+      },
+      onClick: () => {
+        clearInterval(restRef.current);
+        setPhase("work");
+      }
+    }, "Skip rest, start round ", round));
+  }
+  if (phase === "checkin") {
+    const rows = [["energy", "Energy", ["High", "Okay", "Low"]], ["soreness", "Soreness", ["Fresh", "Tight", "Sore"]], ["mood", "Mood", ["😀", "🙂", "😐"]]];
+    return /*#__PURE__*/React.createElement("div", {
+      className: "wk-full",
+      style: {
+        overflowY: "auto"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "wk-head"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "wk-phase-lab",
+      style: {
+        color: C.green
+      }
+    }, "● SESSION LOGGED"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 38
+      }
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: "6px 24px 24px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "syne",
+      style: {
+        fontSize: 28,
+        color: C.textPrimary,
+        marginBottom: 6
+      }
+    }, "Nice work. Quick check-in?"), /*#__PURE__*/React.createElement("div", {
+      className: "muted",
+      style: {
+        fontSize: 14,
+        marginBottom: 24
+      }
+    }, "This teaches CoachMile how to shape your next few days."), rows.map(([key, lab, opts]) => /*#__PURE__*/React.createElement("div", {
+      key: key,
+      style: {
+        marginBottom: 22
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "eyebrow",
+      style: {
+        marginBottom: 10
+      }
+    }, lab), /*#__PURE__*/React.createElement("div", {
+      className: "energy-row"
+    }, opts.map(o => /*#__PURE__*/React.createElement("button", {
+      key: o,
+      className: "energy-btn " + (ci[key] === o ? "sel" : ""),
+      onClick: () => setCi(c => ({
+        ...c,
+        [key]: o
+      }))
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "lb",
+      style: {
+        fontSize: key === "mood" ? 24 : 13
+      }
+    }, o)))))), /*#__PURE__*/React.createElement("button", {
+      className: "btn-primary",
+      style: {
+        opacity: ciDone ? 1 : .45
+      },
+      disabled: !ciDone,
+      onClick: logAndDone
+    }, "Finish")));
+  }
+  if (phase === "done") {
+    return /*#__PURE__*/React.createElement("div", {
+      className: "done-full"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "done-ring fu1",
+      style: {
+        borderColor: C.purple,
+        background: C.purple + "1A",
+        color: C.purple
+      }
+    }, "✓"), /*#__PURE__*/React.createElement("div", {
+      className: "done-title fu2"
+    }, "Strength done."), /*#__PURE__*/React.createElement("div", {
+      className: "muted fu2",
+      style: {
+        fontSize: 14,
+        maxWidth: 280
+      }
+    }, "Strong legs and a strong core are what keep you running without breaking down. Good call today."), /*#__PURE__*/React.createElement("div", {
+      className: "done-stats fu3"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "done-stat"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "n",
+      style: {
+        color: C.purple
+      }
+    }, circuit.rounds), /*#__PURE__*/React.createElement("div", {
+      className: "l"
+    }, "Rounds")), /*#__PURE__*/React.createElement("div", {
+      className: "done-stat"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "n",
+      style: {
+        color: C.purple
+      }
+    }, total), /*#__PURE__*/React.createElement("div", {
+      className: "l"
+    }, "Moves")), /*#__PURE__*/React.createElement("div", {
+      className: "done-stat"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "n",
+      style: {
+        color: C.purple
+      }
+    }, estMin), /*#__PURE__*/React.createElement("div", {
+      className: "l"
+    }, "Minutes"))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: "100%",
+        maxWidth: 320
+      },
+      className: "fu4"
+    }, /*#__PURE__*/React.createElement("button", {
+      className: "btn-primary",
+      onClick: () => onFinish({
+        complete: true
+      })
+    }, "Back to home")));
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    className: "wk-full"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "wk-head"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "wk-phase-lab",
+    style: {
+      color: C.purple
+    }
+  }, "● ROUND ", round, " OF ", circuit.rounds), /*#__PURE__*/React.createElement("button", {
+    className: "wk-x",
+    "aria-label": "Exit workout",
+    onClick: () => {
+      if (confirm("Exit this workout?")) onExit();
+    }
+  }, "✕")), /*#__PURE__*/React.createElement("div", {
+    className: "wk-strip",
+    "aria-hidden": "true"
+  }, Array.from({
+    length: total
+  }).map((_, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    className: "strip-seg"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "strip-fill",
+    style: {
+      width: i < doneCount ? "100%" : "0%",
+      background: C.purple
+    }
+  })))), /*#__PURE__*/React.createElement("div", {
+    className: "wk-body"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "mono",
+    style: {
+      fontSize: 12,
+      color: C.textMuted,
+      letterSpacing: ".1em",
+      marginBottom: 10
+    }
+  }, "MOVE ", exIdx + 1, " OF ", circuit.exercises.length), /*#__PURE__*/React.createElement("div", {
+    className: "wk-cur",
+    style: {
+      color: C.purple,
+      fontSize: 32,
+      textAlign: "center",
+      lineHeight: 1.15
+    }
+  }, ex.name), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: "'Space Grotesk',sans-serif",
+      fontWeight: 700,
+      fontSize: 34,
+      color: C.textPrimary,
+      marginTop: 12
+    }
+  }, ex.detail), /*#__PURE__*/React.createElement("div", {
+    className: "muted",
+    style: {
+      fontSize: 13,
+      marginTop: 16,
+      maxWidth: 280,
+      textAlign: "center"
+    }
+  }, "Move with control. Quality beats speed here.")), /*#__PURE__*/React.createElement("div", {
+    className: "wk-ctrls"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "ctrl-finish",
+    style: {
+      flex: 1,
+      background: C.purple,
+      boxShadow: "none"
+    },
+    onClick: nextExercise
+  }, doneCount + 1 >= total ? "Finish circuit" : "Done, next move →")));
+}
 function WorkoutMode({
   C,
   day,
@@ -3693,7 +4101,7 @@ function blockColor(C, name) {
   return name === "Foundation" ? C.blue : name === "Build" ? C.orange : C.green;
 }
 function slotColor(C, s) {
-  return s === "run" ? C.orange : s === "walk" ? C.blue : C.border;
+  return s === "run" ? C.orange : s === "walk" ? C.blue : s === "strength" ? C.purple : C.border;
 }
 function TrainScreen({
   C,
@@ -3713,7 +4121,8 @@ function TrainScreen({
   const typeLabel = {
     run: "Run",
     walk: "Walk",
-    rest: "Rest"
+    rest: "Rest",
+    strength: "Strength"
   };
   const day = plan[sel];
   const week = computeWeek(profile);
@@ -3773,7 +4182,7 @@ function TrainScreen({
     className: "cal-dow"
   }, d.day), /*#__PURE__*/React.createElement("div", {
     className: "cal-typ"
-  }, /*#__PURE__*/React.createElement(Glyph, {
+  }, d.type === "strength" ? /*#__PURE__*/React.createElement("span", { style: { fontSize: 17 } }, "💪") : /*#__PURE__*/React.createElement(Glyph, {
     name: typeGlyph[d.type],
     size: 19,
     color: sel === i && swapFrom === null || swapFrom === i ? C.orange : C.textSecondary
@@ -3843,13 +4252,26 @@ function TrainScreen({
       fontSize: 14,
       lineHeight: 1.6
     }
-  }, "Rest is where the adaptation happens. Your muscles rebuild, your joints recover, and tomorrow you come back stronger. A gentle 10-minute walk is welcome — but don't chase intensity today."), swapFrom === null && /*#__PURE__*/React.createElement("button", {
+  }, "Rest is where the adaptation happens. Your muscles rebuild, your joints recover, and tomorrow you come back stronger. A gentle 10-minute walk is welcome — but don't chase intensity today."), day.type === "strength" && day.circuit && /*#__PURE__*/React.createElement("div", {
+    style: { marginTop: 6 }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "muted",
+    style: { fontSize: 13, marginBottom: 8, lineHeight: 1.5 }
+  }, "Do all ", day.circuit.rounds, " rounds. Rest about 30 seconds between them."), day.circuit.exercises.map((e, ix) => /*#__PURE__*/React.createElement("div", {
+    className: "iv-bar",
+    key: ix
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "iv-chip",
+    style: { background: C.purple }
+  }, "×", day.circuit.rounds), /*#__PURE__*/React.createElement("div", {
+    style: { flex: 1 }
+  }, /*#__PURE__*/React.createElement("div", { className: "iv-name" }, e.name), /*#__PURE__*/React.createElement("div", { className: "iv-sub" }, e.detail))))), swapFrom === null && /*#__PURE__*/React.createElement("button", {
     className: "btn-soft",
     onClick: () => {
       haptic();
       setSwapFrom(sel);
     }
-  }, "⇄ Move ", day.day, " to another day")), /*#__PURE__*/React.createElement("div", {
+  }, "⇄ Move ", day.day, " to another day")),/*#__PURE__*/React.createElement("div", {
     className: "progress-note fu3 section-gap-sm"
   }, /*#__PURE__*/React.createElement("b", null, day.block, " block:"), " ", day.block === "Foundation" ? "Building the habit and your base. Sessions stay gentle while your body adapts." : day.block === "Build" ? "Run blocks lengthen and walk recoveries shrink — you're bridging toward continuous running." : "Peak weeks. Longer runs, then a taper into your graduation session."), (() => {
     const thisMin = plan.reduce((s, x) => s + (x.totalMin || 0), 0);
@@ -5971,6 +6393,50 @@ function ProfileScreen({
       marginBottom: 4
     }
   }, "Settings"), /*#__PURE__*/React.createElement("div", {
+  style: {
+    padding: "14px 0",
+    borderBottom: "1px solid " + C.borderSoft
+  }
+}, /*#__PURE__*/React.createElement("div", {
+  className: "prof-lab",
+  style: {
+    marginBottom: 9
+  }
+}, "Training focus"), /*#__PURE__*/React.createElement("div", {
+  style: {
+    display: "flex",
+    gap: 7,
+    flexWrap: "wrap"
+  }
+}, [["run", "🏃 Running only"], ["mixed", "🏃 + 💪 Balanced"], ["strength", "💪 Strength focus"]].map(o => {
+  const on = (profile.trainingMix || "run") === o[0];
+  return /*#__PURE__*/React.createElement("button", {
+    key: o[0],
+    onClick: () => {
+      haptic();
+      onUpdate({
+        ...profile,
+        trainingMix: o[0]
+      });
+    },
+    style: {
+      padding: "8px 12px",
+      borderRadius: 11,
+      fontSize: 12.5,
+      border: "1.5px solid " + (on ? C.orange : C.border),
+      background: on ? C.orange + "14" : C.card,
+      color: on ? C.orange : C.textPrimary
+    }
+  }, o[1]);
+})), /*#__PURE__*/React.createElement("div", {
+  className: "mono",
+  style: {
+    fontSize: 10.5,
+    color: C.textMuted,
+    marginTop: 9,
+    lineHeight: 1.5
+  }
+}, "Blends bodyweight strength days into your week. Change it anytime and your plan rebuilds around it.")), /*#__PURE__*/React.createElement("div", {
     className: "prof-row"
   }, /*#__PURE__*/React.createElement("div", {
     className: "prof-lab",
@@ -6811,7 +7277,13 @@ function App() {
   })), /*#__PURE__*/React.createElement(Nav, {
     screen: screen,
     setScreen: setScreen
-  })), appPhase === "app" && workoutDay && /*#__PURE__*/React.createElement(WorkoutMode, {
+  })), appPhase === "app" && workoutDay && (workoutDay.type === "strength" ? /*#__PURE__*/React.createElement(BodyweightMode, {
+    C: C,
+    day: workoutDay,
+    profile: profile,
+    onFinish: finishWorkout,
+    onExit: exitWorkout
+  }) : /*#__PURE__*/React.createElement(WorkoutMode, {
     C: C,
     day: workoutDay,
     profile: profile,
@@ -6819,7 +7291,7 @@ function App() {
     resume: resumeState,
     onFinish: finishWorkout,
     onExit: exitWorkout
-  }), toast && /*#__PURE__*/React.createElement("div", {
+  })), toast && /*#__PURE__*/React.createElement("div", {
     className: "cm-toast",
     role: "status"
   }, toast), ach && /*#__PURE__*/React.createElement(Achievement, {
