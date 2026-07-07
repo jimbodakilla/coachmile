@@ -1197,11 +1197,17 @@ function strengthCircuit(week) {
   ];
   return { rounds, exercises, mins: rounds * exercises.length + (rounds - 1) };
 }
-function weekPattern(profile, week, swaps) {
+function weekPattern(profile, week) {
   const days = profile.daysPerWeek || 4;
-  let base = applyMix(PATTERNS[Math.min(6, Math.max(2, days))] || PATTERNS[4], profile.trainingMix);
-  if (swaps && swaps[week] && Array.isArray(swaps[week]) && swaps[week].length === 7) return swaps[week];
-  return base;
+  return applyMix(PATTERNS[Math.min(6, Math.max(2, days))] || PATTERNS[4], profile.trainingMix);
+}
+/* #56 a day-swap is a position permutation (which built workout sits at each slot),
+   applied AFTER shaping so the whole session travels with the move. Numeric-only guard
+   discards any legacy type-array swaps from older builds. */
+function swapPerm(swaps, week) {
+  const p = swaps && swaps[week];
+  if (Array.isArray(p) && p.length === 7 && p.every(n => typeof n === "number")) return p;
+  return null;
 }
 function buildPlan(profile, lastCheckin, opts) {
   opts = opts || {};
@@ -1214,7 +1220,7 @@ function buildPlan(profile, lastCheckin, opts) {
     grad = isGraduation(week);
   const blk = blockOf(week).name;
   const dow = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  const pat = weekPattern(profile, week, opts.swaps);
+  const pat = weekPattern(profile, week);
   const cyc = cyclePhaseNow(profile);
   const cycleEase = cyc === "Luteal" || cyc === "Menstrual";
   const runIdxs = pat.map((s, i) => s === "run" ? i : -1).filter(i => i >= 0);
@@ -1222,7 +1228,7 @@ function buildPlan(profile, lastCheckin, opts) {
   runIdxs.forEach((idx, k) => {
     if (k === 0) shapeByIdx[idx] = "quality";else if (k === runIdxs.length - 1 && runIdxs.length >= 2 && week >= 3) shapeByIdx[idx] = "long";else shapeByIdx[idx] = "easy";
   });
-  return pat.map((slot, i) => {
+  const built = pat.map((slot, i) => {
     const meta = {
       planKey: base,
       goals,
@@ -1301,6 +1307,10 @@ function buildPlan(profile, lastCheckin, opts) {
       recoveryNote
     };
   });
+  const perm = swapPerm(opts.swaps, week);
+  if (!perm) return built;
+  // move each fully-built workout to its swapped slot, relabel the weekday to match position
+  return perm.map((src, pos) => ({ ...built[src], day: dow[pos] }));
 }
 /* #18 cycle-sync — auto-advance the phase from the onboarding phase (~1 phase/week) */
 const CYCLE_ORDER = ["Menstrual", "Follicular", "Ovulatory", "Luteal"];
@@ -1332,7 +1342,9 @@ function planOverview(profile, swaps) {
   const cur = computeWeek(profile);
   const out = [];
   for (let w = 1; w <= 12; w++) {
-    const pat = weekPattern(profile, w, swaps);
+    let pat = weekPattern(profile, w);
+    const perm = swapPerm(swaps, w);
+    if (perm) pat = perm.map(src => pat[src]);
     out.push({
       week: w,
       block: blockOf(w).name,
@@ -4103,16 +4115,79 @@ function blockColor(C, name) {
 function slotColor(C, s) {
   return s === "run" ? C.orange : s === "walk" ? C.blue : s === "strength" ? C.purple : C.border;
 }
+function intensityOf(day) {
+  if (!day) return {
+    label: "",
+    ck: "textMuted"
+  };
+  if (day.type === "rest") return {
+    label: "Recovery",
+    ck: "textMuted"
+  };
+  if (day.type === "walk") return {
+    label: "Easy",
+    ck: "green"
+  };
+  if (day.type === "strength") return {
+    label: "Strength",
+    ck: "purple"
+  };
+  if (day.deload) return {
+    label: "Recovery",
+    ck: "green"
+  };
+  if (day.shape === "easy") return {
+    label: "Easy",
+    ck: "green"
+  };
+  if (day.shape === "long") return {
+    label: "Steady",
+    ck: "orange"
+  };
+  return {
+    label: "Hard",
+    ck: "red"
+  };
+}
+function isHard(day) {
+  return intensityOf(day).label === "Hard";
+}
+/* a demanding day is a quality session OR a long run — stacking two on
+   back-to-back days is the swap we warn about */
+function isDemanding(day) {
+  if (!day) return false;
+  return isHard(day) || day.type === "run" && day.shape === "long";
+}
+function whyWorkout(day) {
+  if (!day) return "";
+  if (day.type === "rest") return "Recovery is when the training actually sticks.";
+  if (day.type === "walk") return "Low-impact miles that build your base without the pounding.";
+  if (day.type === "strength") return "Strong legs and a strong core keep you running without breaking down.";
+  if (day.deload) return "A lighter week so your body absorbs the work you've put in.";
+  var t = day.title || "";
+  if (/Tempo/.test(t)) return "Sustained effort that lifts the pace you can hold.";
+  if (/Interval/.test(t)) return "Short, hard reps that build your top-end speed.";
+  if (/Hill/.test(t)) return "Hills build power and strength with less impact than flat speed.";
+  if (/Fartlek/.test(t)) return "Playing with pace teaches your body to change gears.";
+  if (/Long/.test(t)) return "Time on your feet grows your endurance more than anything else.";
+  if (/Graduation/.test(t)) return "Your test run. Everything's been building to this.";
+  return "Steady running that grows your aerobic base.";
+}
 function TrainScreen({
   C,
   plan,
   profile,
   swaps,
-  onSwapDays
+  onSwapDays,
+  checkins,
+  todayIdx,
+  onStart
 }) {
-  const [sel, setSel] = useState(0);
   const [view, setView] = useState("week");
+  const [sheetDay, setSheetDay] = useState(null);
   const [swapFrom, setSwapFrom] = useState(null);
+  const [previewWeek, setPreviewWeek] = useState(null);
+  const [showIvs, setShowIvs] = useState(false);
   const typeGlyph = {
     run: "run",
     walk: "walk",
@@ -4124,22 +4199,74 @@ function TrainScreen({
     rest: "Rest",
     strength: "Strength"
   };
-  const day = plan[sel];
-  const week = computeWeek(profile);
-  const overview = planOverview(profile, swaps);
-  const onDayTap = i => {
-    haptic();
-    if (swapFrom !== null) {
-      if (swapFrom !== i) onSwapDays(swapFrom, i);
+  const ICOL = {
+    textMuted: C.textMuted,
+    green: C.green,
+    orange: C.orange,
+    red: C.red,
+    purple: C.purple,
+    blue: C.blue
+  };
+  const curWeek = computeWeek(profile);
+  const previewing = previewWeek != null && previewWeek !== curWeek;
+  const vweek = previewing ? previewWeek : curWeek;
+  const vplan = useMemo(() => previewing ? buildPlan(profile, null, {
+    weekOverride: previewWeek,
+    swaps
+  }) : plan, [previewing, previewWeek, plan, profile, swaps]);
+  const overview = useMemo(() => planOverview(profile, swaps), [profile, swaps]);
+  // #3 completion this week (from history)
+  const monday = shiftDay(todayStr(), -(todayIdx || 0));
+  const doneSet = {};
+  if (!previewing) vplan.forEach((dd, i) => {
+    const dt = shiftDay(monday, i);
+    doneSet[i] = dd.type !== "rest" && (checkins || []).some(c => c.date === dt);
+  });
+  // #6 load-jump vs last week
+  const loadJump = useMemo(() => {
+    if (previewing) return 0;
+    const thisMin = vplan.reduce((s, x) => s + (x.totalMin || 0), 0);
+    const lastMin = vweek > 1 ? buildPlan(profile, null, {
+      weekOverride: vweek - 1,
+      swaps
+    }).reduce((s, x) => s + (x.totalMin || 0), 0) : 0;
+    return lastMin > 0 && thisMin > lastMin * 1.2 ? Math.round((thisMin / lastMin - 1) * 100) : 0;
+  }, [previewing, vplan, vweek, profile, swaps]);
+  const tryswap = to => {
+    const from = swapFrom;
+    if (from === to) {
       setSwapFrom(null);
       return;
     }
-    track("day_tap", {
-      day: plan[i].day,
-      type: plan[i].type
-    });
-    setSel(i);
+    const after = vplan.map((dd, i) => i === from ? vplan[to] : i === to ? vplan[from] : dd);
+    let risky = false;
+    for (let i = 0; i < 6; i++) {
+      if (isDemanding(after[i]) && isDemanding(after[i + 1])) risky = true;
+    }
+    haptic();
+    if (risky && !confirm("Heads up: this puts two hard days back to back, which raises injury risk. Swap anyway?")) {
+      setSwapFrom(null);
+      return;
+    }
+    onSwapDays(from, to);
+    setSwapFrom(null);
   };
+  const openDay = i => {
+    if (swapFrom !== null) {
+      tryswap(i);
+      return;
+    }
+    haptic();
+    track("day_tap", {
+      day: vplan[i].day,
+      type: vplan[i].type
+    });
+    setShowIvs(false);
+    setSheetDay(i);
+  };
+  const d = sheetDay != null ? vplan[sheetDay] : null;
+  const isTodaySel = !previewing && sheetDay === todayIdx;
+  const dInt = d ? intensityOf(d) : null;
   return /*#__PURE__*/React.createElement("div", {
     className: "scroll"
   }, /*#__PURE__*/React.createElement("div", {
@@ -4152,6 +4279,8 @@ function TrainScreen({
     onClick: () => {
       haptic();
       setSwapFrom(null);
+      setSheetDay(null);
+      setPreviewWeek(null);
       setView("week");
     }
   }, "This week"), /*#__PURE__*/React.createElement("button", {
@@ -4159,6 +4288,7 @@ function TrainScreen({
     onClick: () => {
       haptic();
       setSwapFrom(null);
+      setSheetDay(null);
       setView("plan");
     }
   }, "Full 12 weeks")), view === "week" ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
@@ -4166,136 +4296,145 @@ function TrainScreen({
   }, /*#__PURE__*/React.createElement("div", {
     className: "eyebrow",
     style: {
-      marginBottom: 10
-    }
-  }, "Week ", week, " · ", day.block, " block · Plan ", plan[0].planKey), swapFrom !== null && /*#__PURE__*/React.createElement("div", {
-    className: "swap-banner"
-  }, /*#__PURE__*/React.createElement("span", null, "⇄"), /*#__PURE__*/React.createElement("span", null, "Tap another day to swap with ", /*#__PURE__*/React.createElement("b", null, plan[swapFrom].day), ", or tap ", plan[swapFrom].day, " again to cancel.")), /*#__PURE__*/React.createElement("div", {
-    className: "cal-strip"
-  }, plan.map((d, i) => /*#__PURE__*/React.createElement("button", {
-    key: i,
-    className: "cal-day " + (sel === i && swapFrom === null ? "sel" : "") + (swapFrom === i ? " swapping" : ""),
-    "aria-label": d.day + " — " + typeLabel[d.type],
-    "aria-pressed": sel === i,
-    onClick: () => onDayTap(i)
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "cal-dow"
-  }, d.day), /*#__PURE__*/React.createElement("div", {
-    className: "cal-typ"
-  }, d.type === "strength" ? /*#__PURE__*/React.createElement("span", { style: { fontSize: 17 } }, "💪") : /*#__PURE__*/React.createElement(Glyph, {
-    name: typeGlyph[d.type],
-    size: 19,
-    color: sel === i && swapFrom === null || swapFrom === i ? C.orange : C.textSecondary
-  })))))), /*#__PURE__*/React.createElement("div", {
-    className: "card fu2 section-gap-sm"
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      marginBottom: 4
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "h-sec"
-  }, day.title), /*#__PURE__*/React.createElement("span", {
-    className: "plan-badge"
-  }, day.totalMin, " min")), /*#__PURE__*/React.createElement("div", {
-    className: "muted",
-    style: {
-      fontSize: 13,
-      marginBottom: day.type === "run" ? 8 : 0
-    }
-  }, day.focus), day.deload && /*#__PURE__*/React.createElement("div", {
-    className: "goal-chips",
-    style: {
       marginBottom: 8
     }
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "goal-chip",
+  }, "Week ", vweek, " · ", vplan[0].block, " block · Plan ", vplan[0].planKey), previewing && /*#__PURE__*/React.createElement("div", {
+    className: "swap-banner",
     style: {
-      color: C.yellow,
-      background: C.yellow + "14",
-      borderColor: C.yellow + "33"
+      background: C.info + "12",
+      borderColor: C.info + "40"
     }
-  }, "Deload · lighter on purpose")), day.type === "run" && day.mods && day.mods.length > 0 && /*#__PURE__*/React.createElement("div", {
-    className: "goal-chips",
+  }, /*#__PURE__*/React.createElement("span", null, "👁️"), /*#__PURE__*/React.createElement("span", {
     style: {
-      marginBottom: 8
+      color: C.textSecondary
     }
-  }, day.mods.map((m, i) => /*#__PURE__*/React.createElement("span", {
-    className: "goal-chip",
-    key: i
-  }, m))), (day.type === "run" || day.type === "walk") && /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginTop: 6
-    }
-  }, day.intervals.map((iv, i) => /*#__PURE__*/React.createElement("div", {
-    className: "iv-bar",
-    key: i
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "iv-chip",
-    style: {
-      background: ivColor(C, iv.type)
-    }
-  }, iv.duration < 1 ? Math.round(iv.duration * 60) + "s" : iv.duration + "m"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      flex: 1
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "iv-name"
-  }, iv.name), /*#__PURE__*/React.createElement("div", {
-    className: "iv-sub"
-  }, uSpeed(iv.speed, profile), " · ", (iv.incline || 0).toFixed(1), "% incline", iv.type === "run" ? " · " + paceStr(iv.speed, profile) : ""))))), day.type === "rest" && /*#__PURE__*/React.createElement("div", {
-    style: {
-      padding: "14px 0 4px",
-      color: C.textSecondary,
-      fontSize: 14,
-      lineHeight: 1.6
-    }
-  }, "Rest is where the adaptation happens. Your muscles rebuild, your joints recover, and tomorrow you come back stronger. A gentle 10-minute walk is welcome — but don't chase intensity today."), day.type === "strength" && day.circuit && /*#__PURE__*/React.createElement("div", {
-    style: { marginTop: 6 }
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "muted",
-    style: { fontSize: 13, marginBottom: 8, lineHeight: 1.5 }
-  }, "Do all ", day.circuit.rounds, " rounds. Rest about 30 seconds between them."), day.circuit.exercises.map((e, ix) => /*#__PURE__*/React.createElement("div", {
-    className: "iv-bar",
-    key: ix
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "iv-chip",
-    style: { background: C.purple }
-  }, "×", day.circuit.rounds), /*#__PURE__*/React.createElement("div", {
-    style: { flex: 1 }
-  }, /*#__PURE__*/React.createElement("div", { className: "iv-name" }, e.name), /*#__PURE__*/React.createElement("div", { className: "iv-sub" }, e.detail))))), swapFrom === null && /*#__PURE__*/React.createElement("button", {
-    className: "btn-soft",
+  }, "Previewing week ", vweek, ". ", /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       haptic();
-      setSwapFrom(sel);
+      setPreviewWeek(null);
+      setSheetDay(null);
+    },
+    style: {
+      color: C.info,
+      fontWeight: 600,
+      background: "none",
+      border: "none",
+      padding: 0,
+      cursor: "pointer",
+      fontFamily: "inherit",
+      fontSize: "inherit"
     }
-  }, "⇄ Move ", day.day, " to another day")),/*#__PURE__*/React.createElement("div", {
+  }, "Back to week ", curWeek))), swapFrom !== null && /*#__PURE__*/React.createElement("div", {
+    className: "swap-banner"
+  }, /*#__PURE__*/React.createElement("span", null, "⇄"), /*#__PURE__*/React.createElement("span", null, "Tap another day to swap with ", /*#__PURE__*/React.createElement("b", null, vplan[swapFrom].day), ", or tap ", vplan[swapFrom].day, " again to cancel.")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 12,
+      flexWrap: "wrap",
+      fontSize: 10.5,
+      color: C.textMuted,
+      marginBottom: 8
+    }
+  }, [["Recovery", "textMuted"], ["Easy", "green"], ["Steady", "orange"], ["Hard", "red"]].map(x => /*#__PURE__*/React.createElement("span", {
+    key: x[0],
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 5
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: 8,
+      height: 8,
+      borderRadius: "50%",
+      background: ICOL[x[1]]
+    }
+  }), x[0]))), /*#__PURE__*/React.createElement("div", {
+    className: "cal-strip"
+  }, vplan.map((dd, i) => {
+    const it = intensityOf(dd);
+    const isToday = !previewing && i === todayIdx;
+    const done = !!doneSet[i];
+    return /*#__PURE__*/React.createElement("button", {
+      key: i,
+      className: "cal-day " + (swapFrom === i ? "swapping" : ""),
+      style: {
+        position: "relative"
+      },
+      "aria-label": dd.day + " — " + typeLabel[dd.type] + ", " + it.label + (isToday ? ", today" : "") + (done ? ", done" : ""),
+      "aria-pressed": sheetDay === i,
+      onClick: () => openDay(i)
+    }, done && /*#__PURE__*/React.createElement("span", {
+      style: {
+        position: "absolute",
+        top: 3,
+        right: 5,
+        color: C.green,
+        fontSize: 11,
+        lineHeight: 1
+      }
+    }, "✓"), /*#__PURE__*/React.createElement("div", {
+      className: "cal-dow",
+      style: isToday ? {
+        color: C.orange,
+        fontWeight: 700
+      } : undefined
+    }, dd.day), /*#__PURE__*/React.createElement("div", {
+      className: "cal-typ"
+    }, dd.type === "strength" ? /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 17
+      }
+    }, "💪") : /*#__PURE__*/React.createElement(Glyph, {
+      name: typeGlyph[dd.type],
+      size: 19,
+      color: swapFrom === i ? C.orange : C.textSecondary
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: 5,
+        display: "flex",
+        justifyContent: "center"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        width: 14,
+        height: 4,
+        borderRadius: 2,
+        background: ICOL[it.ck]
+      }
+    })), isToday && /*#__PURE__*/React.createElement("div", {
+      className: "mono",
+      style: {
+        fontSize: 7,
+        color: C.orange,
+        letterSpacing: ".04em",
+        marginTop: 2
+      }
+    }, "TODAY"));
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "muted",
+    style: {
+      fontSize: 11.5,
+      textAlign: "center",
+      marginTop: 8
+    }
+  }, "Tap a day to open the session.")), loadJump > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "swap-banner fu2 section-gap-sm",
+    style: {
+      background: C.yellow + "12",
+      borderColor: C.yellow + "40"
+    }
+  }, /*#__PURE__*/React.createElement("span", null, "⚖️"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: C.textSecondary
+    }
+  }, "This week jumps ", /*#__PURE__*/React.createElement("b", {
+    style: {
+      color: C.yellow
+    }
+  }, loadJump, "%"), " in volume over last week. If your legs feel it, take an extra rest day. The plan will keep.")), /*#__PURE__*/React.createElement("div", {
     className: "progress-note fu3 section-gap-sm"
-  }, /*#__PURE__*/React.createElement("b", null, day.block, " block:"), " ", day.block === "Foundation" ? "Building the habit and your base. Sessions stay gentle while your body adapts." : day.block === "Build" ? "Run blocks lengthen and walk recoveries shrink — you're bridging toward continuous running." : "Peak weeks. Longer runs, then a taper into your graduation session."), (() => {
-    const thisMin = plan.reduce((s, x) => s + (x.totalMin || 0), 0);
-    const lastMin = week > 1 ? buildPlan(profile, null, {
-      weekOverride: week - 1,
-      swaps
-    }).reduce((s, x) => s + (x.totalMin || 0), 0) : 0;
-    if (lastMin > 0 && thisMin > lastMin * 1.2) return /*#__PURE__*/React.createElement("div", {
-      className: "swap-banner fu4 section-gap-sm",
-      style: {
-        background: C.yellow + "12",
-        borderColor: C.yellow + "40"
-      }
-    }, /*#__PURE__*/React.createElement("span", null, "⚖️"), /*#__PURE__*/React.createElement("span", {
-      style: {
-        color: C.textSecondary
-      }
-    }, "This week jumps ", /*#__PURE__*/React.createElement("b", {
-      style: {
-        color: C.yellow
-      }
-    }, Math.round((thisMin / lastMin - 1) * 100), "%"), " in volume. If your legs feel it, take an extra rest day — the plan will keep."));
-    return null;
-  })(), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("b", null, vplan[0].block, " block:"), " ", vplan[0].block === "Foundation" ? "Building the habit and your base. Sessions stay gentle while your body adapts." : vplan[0].block === "Build" ? "Run blocks lengthen and the real workouts begin. You're bridging toward continuous running." : "Peak weeks. Longer runs and hard sessions, then a taper into your graduation 5K."), /*#__PURE__*/React.createElement("div", {
     className: "card fu4 section-gap-sm"
   }, /*#__PURE__*/React.createElement("div", {
     className: "eyebrow",
@@ -4321,7 +4460,175 @@ function TrainScreen({
       fontSize: 13,
       lineHeight: 1.55
     }
-  }, "Incline walking between runs burns real fat and grows your aerobic base with almost none of the impact of running. It's how you train more often without breaking your legs down — and it makes your run days feel easier."))) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+  }, "Incline walking between runs burns real fat and grows your aerobic base with almost none of the impact of running. It's how you train more often without breaking your legs down, and it makes your run days feel easier.")), d && /*#__PURE__*/React.createElement("div", {
+    className: "sheet-scrim",
+    onClick: () => setSheetDay(null)
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "sheet",
+    role: "dialog",
+    "aria-label": d.day + " session",
+    onClick: e => e.stopPropagation(),
+    style: {
+      maxHeight: "86vh",
+      overflowY: "auto"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "sheet-grip"
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+      gap: 10,
+      marginBottom: 6
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "mono",
+    style: {
+      fontSize: 10,
+      color: C.textMuted,
+      letterSpacing: ".1em",
+      textTransform: "uppercase",
+      marginBottom: 3
+    }
+  }, d.day, isTodaySel ? " · Today" : ""), /*#__PURE__*/React.createElement("div", {
+    className: "h-sec",
+    style: {
+      fontSize: 20
+    }
+  }, d.title)), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontFamily: "'IBM Plex Mono',monospace",
+      fontSize: 10.5,
+      letterSpacing: ".05em",
+      textTransform: "uppercase",
+      padding: "5px 10px",
+      borderRadius: 20,
+      color: ICOL[dInt.ck],
+      background: ICOL[dInt.ck] + "1A",
+      flexShrink: 0
+    }
+  }, dInt.label)), /*#__PURE__*/React.createElement("div", {
+    className: "muted",
+    style: {
+      fontSize: 13,
+      marginBottom: 4
+    }
+  }, d.totalMin, " min · ", d.focus), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12.5,
+      color: C.textSecondary,
+      lineHeight: 1.5,
+      marginBottom: 14
+    }
+  }, whyWorkout(d)), d.deload && /*#__PURE__*/React.createElement("div", {
+    className: "goal-chips",
+    style: {
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "goal-chip",
+    style: {
+      color: C.yellow,
+      background: C.yellow + "14",
+      borderColor: C.yellow + "33"
+    }
+  }, "Deload · lighter on purpose")), d.type === "run" && d.mods && d.mods.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "goal-chips",
+    style: {
+      marginBottom: 12
+    }
+  }, d.mods.map((m, i) => /*#__PURE__*/React.createElement("span", {
+    className: "goal-chip",
+    key: i
+  }, m))), (d.type === "run" || d.type === "walk") && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "interval-preview",
+    style: {
+      marginBottom: 12
+    }
+  }, d.intervals.map((iv, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    className: "ip-seg",
+    style: {
+      flex: iv.duration,
+      background: ivColor(C, iv.type)
+    }
+  }))), !showIvs ? /*#__PURE__*/React.createElement("button", {
+    className: "btn-soft",
+    onClick: () => setShowIvs(true)
+  }, "Show all ", d.intervals.length, " intervals") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 2
+    }
+  }, d.intervals.map((iv, i) => /*#__PURE__*/React.createElement("div", {
+    className: "iv-bar",
+    key: i
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "iv-chip",
+    style: {
+      background: ivColor(C, iv.type)
+    }
+  }, iv.duration < 1 ? Math.round(iv.duration * 60) + "s" : iv.duration + "m"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "iv-name"
+  }, iv.name), /*#__PURE__*/React.createElement("div", {
+    className: "iv-sub"
+  }, uSpeed(iv.speed, profile), " · ", (iv.incline || 0).toFixed(1), "% incline", iv.type === "run" ? " · " + paceStr(iv.speed, profile) : ""))))), /*#__PURE__*/React.createElement("button", {
+    className: "btn-soft",
+    onClick: () => setShowIvs(false)
+  }, "Hide intervals"))), d.type === "rest" && /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "6px 0 4px",
+      color: C.textSecondary,
+      fontSize: 14,
+      lineHeight: 1.6
+    }
+  }, "Rest is where the adaptation happens. Your muscles rebuild and your joints recover. A gentle 10-minute walk is welcome, but don't chase intensity today."), d.type === "strength" && d.circuit && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "muted",
+    style: {
+      fontSize: 13,
+      marginBottom: 8,
+      lineHeight: 1.5
+    }
+  }, "Do all ", d.circuit.rounds, " rounds. Rest about 30 seconds between them."), d.circuit.exercises.map((e, ix) => /*#__PURE__*/React.createElement("div", {
+    className: "iv-bar",
+    key: ix
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "iv-chip",
+    style: {
+      background: C.purple
+    }
+  }, "×", d.circuit.rounds), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "iv-name"
+  }, e.name), /*#__PURE__*/React.createElement("div", {
+    className: "iv-sub"
+  }, e.detail))))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 16,
+      display: "flex",
+      flexDirection: "column",
+      gap: 8
+    }
+  }, isTodaySel && d.type !== "rest" && /*#__PURE__*/React.createElement("button", {
+    className: "btn-primary",
+    onClick: () => {
+      setSheetDay(null);
+      onStart(d);
+    }
+  }, "Start this session"), !previewing && d.type !== "rest" && /*#__PURE__*/React.createElement("button", {
+    className: "btn-soft",
+    onClick: () => {
+      setSheetDay(null);
+      setSwapFrom(sheetDay);
+    }
+  }, "⇄ Move ", d.day, " to another day"))))) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     className: "fu1"
   }, /*#__PURE__*/React.createElement("div", {
     className: "eyebrow",
@@ -4340,11 +4647,28 @@ function TrainScreen({
     }
   }), "Walk"), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("i", {
     style: {
+      background: C.purple
+    }
+  }), "Strength"), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("i", {
+    style: {
       background: C.border
     }
-  }), "Rest")), overview.map(w => /*#__PURE__*/React.createElement("div", {
+  }), "Rest")), overview.map(w => /*#__PURE__*/React.createElement("button", {
+    key: w.week,
     className: "pv-week " + (w.current ? "cur" : ""),
-    key: w.week
+    style: {
+      width: "100%",
+      textAlign: "left",
+      cursor: "pointer"
+    },
+    "aria-label": "Preview week " + w.week,
+    onClick: () => {
+      haptic();
+      setPreviewWeek(w.week);
+      setSheetDay(null);
+      setSwapFrom(null);
+      setView("week");
+    }
   }, /*#__PURE__*/React.createElement("div", {
     className: "blkbar",
     style: {
@@ -4383,9 +4707,18 @@ function TrainScreen({
     key: k,
     className: "pv-dot",
     style: {
-      background: slotColor(C, s)
+      background: slotColor(C, s),
+      width: 10,
+      height: 10
     }
-  })))))), /*#__PURE__*/React.createElement("div", {
+  })))), /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: C.textMuted,
+      fontSize: 18,
+      alignSelf: "center",
+      paddingRight: 2
+    }
+  }, "›"))), /*#__PURE__*/React.createElement("div", {
     className: "muted",
     style: {
       fontSize: 12,
@@ -4393,8 +4726,9 @@ function TrainScreen({
       lineHeight: 1.55,
       textAlign: "center"
     }
-  }, "Weeks 4 & 8 are deloads — lighter on purpose so your body absorbs the work. Week 12 tapers into a graduation 5K."))));
+  }, "Tap any week to preview it. Weeks 4 and 8 are deloads, lighter on purpose so your body absorbs the work. Week 12 tapers into a graduation 5K."))));
 }
+
 
 /* ============================================================
    FOOD SCREEN
@@ -4944,7 +5278,13 @@ function NutritionCoach({
     cook: "Some",
     budget: "Normal"
   });
-  const dayTypes = weekPattern(profile, computeWeek(profile), LS.get("coachmile_swaps", {})).map(s => s === "run" ? "run" : s === "walk" ? "walk" : "rest");
+  const dayTypes = (() => {
+    const wk = computeWeek(profile);
+    let pat = weekPattern(profile, wk);
+    const perm = swapPerm(LS.get("coachmile_swaps", {}), wk);
+    if (perm) pat = perm.map(src => pat[src]);
+    return pat.map(s => s === "run" ? "run" : s === "walk" ? "walk" : "rest");
+  })();
   const build = p => {
     const np = genMealPlan(profile, p, dayTypes);
     setPlan(np);
@@ -6921,13 +7261,13 @@ function App() {
   // #56 swap two days within the current week
   const swapDays = (i, j) => {
     if (i === j) return;
-    const pat = weekPattern(profile, curWeek, swaps).slice();
-    const t = pat[i];
-    pat[i] = pat[j];
-    pat[j] = t;
+    const cur = swapPerm(swaps, curWeek) ? swapPerm(swaps, curWeek).slice() : [0, 1, 2, 3, 4, 5, 6];
+    const t = cur[i];
+    cur[i] = cur[j];
+    cur[j] = t;
     const ns = {
       ...swaps,
-      [curWeek]: pat
+      [curWeek]: cur
     };
     setSwaps(ns);
     LS.set(K.swaps, ns);
@@ -7186,7 +7526,10 @@ function App() {
     plan: plan,
     profile: profile,
     swaps: swaps,
-    onSwapDays: swapDays
+    onSwapDays: swapDays,
+    checkins: checkins,
+    todayIdx: todayIdx,
+    onStart: startWorkout
   })), screen === "food" && /*#__PURE__*/React.createElement(ErrorBoundary, {
     name: "food"
   }, /*#__PURE__*/React.createElement(FoodScreen, {
