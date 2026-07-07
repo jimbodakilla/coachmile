@@ -1111,13 +1111,12 @@ function buildWalkDay(goals, timeTarget) {
     speed: 2.8,
     incline: 0
   };
-  const workMin = Math.max(block.duration, (timeTarget || 30) - 10);
-  const nBlocks = Math.max(1, Math.round(workMin / block.duration));
-  const ivs = [warm];
-  for (let i = 0; i < nBlocks; i++) ivs.push({
-    ...block
-  });
-  ivs.push(cool);
+  const workMin = Math.max(5, (timeTarget || 30) - 10);
+  // steady walk = one continuous block, not N identical repeats (no intervals to cue)
+  const ivs = [warm, {
+    ...block,
+    duration: workMin
+  }, cool];
   return {
     ivs,
     title,
