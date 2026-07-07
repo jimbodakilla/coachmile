@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="CoachMile">
-<title>CoachMile — Your Treadmill Coach</title>
+<title>CoachMile · Your Treadmill Coach</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" type="image/png" href="icon-192.png">
@@ -1434,19 +1434,19 @@ const ACHIEVEMENTS = [{
   id: "ten",
   icon: "⭐",
   title: "Ten Sessions",
-  desc: "Ten workouts banked. This is a habit now.",
+  desc: "Ten workouts done. This is a habit now.",
   check: s => s.sessions >= 10
 }, {
   id: "five_k",
   icon: "🎽",
   title: "5K Distance",
-  desc: "3.1 miles in one session. Real runner turf.",
+  desc: "3.1 miles in one go. That's real runner territory.",
   check: s => s.maxMiles >= 3.1
 }, {
   id: "graduate",
   icon: "🎓",
   title: "Graduate",
-  desc: "You finished the 12-week program. Incredible.",
+  desc: "You finished all 12 weeks. That's a big deal.",
   check: s => s.graduated
 }];
 function computeStats(checkins, streak) {
@@ -1464,12 +1464,12 @@ function unlockedIds(stats) {
 }
 
 /* #52 rotated completion celebrations — the tenth run shouldn't feel photocopied */
-const CELEBRATIONS = ["That's another honest session banked, {name}. Recovery starts now.", "You showed up when it counted, {name}. That's the whole game.", "One more done. Nobody can take this one back, {name}.", "Look at that — you finished. Future you says thanks.", "Steady, {name}. Steady is how milestones get built.", "That's the work. Quiet, unglamorous, and exactly enough.", "You could've skipped it. You didn't. That's who you are now.", "Another mile closer, {name}. The plan is working because you are.", "Banked. Rest tonight — you've earned an easy conscience.", "That's how runners are made, {name}: one session you almost skipped."];
+const CELEBRATIONS = ["That's another honest session banked, {name}. Recovery starts now.", "You showed up when it counted, {name}. That's the whole game.", "One more done. Nobody can take this one back, {name}.", "Look at that, you finished. Future you says thanks.", "Steady, {name}. Steady is how milestones get built.", "That's the work. Quiet, unglamorous, and it counts.", "You could've skipped it. You didn't. That's who you are now.", "Another mile closer, {name}. The plan is working because you are.", "Banked. Get some rest tonight, you earned it.", "That's how runners are made, {name}: one session you almost skipped."];
 function celebrationFor(sessions, name) {
   return CELEBRATIONS[(Math.max(1, sessions) - 1) % CELEBRATIONS.length].replace("{name}", name || "friend");
 }
 /* #15 rotating daily form cue */
-const FORM_CUES = ["Run tall — imagine a string lifting the crown of your head.", "Short, quick steps beat long reaches. Keep your feet light.", "Relax your shoulders and unclench your hands.", "Breathe into your belly, not just your chest.", "Look ahead at the wall, not down at the belt.", "Land under your hips, not out in front of you.", "Quick cadence, quiet feet — think 'pitter-patter'."];
+const FORM_CUES = ["Run tall, like a string's pulling up the top of your head.", "Short, quick steps beat long reaches. Keep your feet light.", "Relax your shoulders and unclench your hands.", "Breathe into your belly, not just your chest.", "Look ahead at the wall, not down at the belt.", "Land under your hips, not out in front of you.", "Quick, quiet feet. Think pitter-patter."];
 function formCueFor(week, dayIdx) {
   return FORM_CUES[(((week || 1) + (dayIdx || 0)) % FORM_CUES.length + FORM_CUES.length) % FORM_CUES.length];
 }
@@ -2234,15 +2234,15 @@ function coachMessage(profile, energy, cyclePhase, recoveryNote) {
   if (recoveryNote) return recoveryNote;
   const name = profile.name || "there";
   const goals = Array.isArray(profile.mainGoal) ? profile.mainGoal : [];
-  if (cyclePhase === "Luteal") return `This is a hormonal week, ${name} — not weakness. We'll keep it steady and kind today.`;
-  if (cyclePhase === "Ovulatory") return `You're near peak energy, ${name}. Great day to push your run blocks a little.`;
-  if (cyclePhase === "Follicular") return `Energy's building this phase, ${name}. Let's ride it and add a touch of intensity.`;
+  if (cyclePhase === "Luteal") return `This week can feel like a slog, ${name}, and that's the hormones, not you. We'll keep it easy today.`;
+  if (cyclePhase === "Ovulatory") return `Your energy's usually up around now, ${name}. Good day to push the run blocks a bit.`;
+  if (cyclePhase === "Follicular") return `Your energy's picking up this week, ${name}. Let's use it and push a little.`;
   if (cyclePhase === "Menstrual") return `Be gentle with yourself today, ${name}. Movement helps, but easy is enough.`;
-  const why = goals.includes("Lose weight") ? "every honest session moves you toward your goal weight" : goals.includes("Build endurance") ? "today adds another brick to your endurance" : goals.includes("Reduce stress") ? "this is your time to move and clear your head" : "today's another chance to stack one honest session";
-  if (energy === "Low" && profile.why) return `Low tank today, ${name}? Remember why you started: "${profile.why}." Even a short session honors that.`;
-  if (energy === "Low") return `Low tank today, ${name}? That's fine — even a short, easy session keeps your streak and your momentum alive.`;
+  const why = goals.includes("Lose weight") ? "every honest session moves you toward your goal weight" : goals.includes("Build endurance") ? "today builds your endurance up a little more" : goals.includes("Reduce stress") ? "this is your time to move and clear your head" : "today's another chance to stack one honest session";
+  if (energy === "Low" && profile.why) return `Low tank today, ${name}? Remember why you started: "${profile.why}." Even a short one counts toward that.`;
+  if (energy === "Low") return `Low tank today, ${name}? That's okay. Even a short, easy one keeps your streak going.`;
   if (profile.why && energy !== "High" && Math.abs((name.length + (goals.length || 0)) % 3) === 0) return `You told us why: "${profile.why}." Today's session is one more step toward it, ${name}.`;
-  if (energy === "High") return `You're charged up, ${name} — and ${why}. Let's make it count.`;
+  if (energy === "High") return `You're charged up, ${name}, and ${why}. Let's make it count.`;
   return `Good to see you, ${name}. Remember, ${why}. Let's roll.`;
 }
 const IV_LEGEND = [["walk", "Walk"], ["run", "Run"], ["cool", "Cool-down"]];
@@ -3892,6 +3892,705 @@ function PlateModel({
     strokeWidth: "1.5"
   }));
 }
+/* meal library — contains tokens: meat, fish, shellfish, dairy, egg, gluten, nuts, pork; lean: carb|protein|balanced */
+const MEAL_DB = [
+// breakfast
+{
+  ty: "breakfast",
+  n: "Overnight oats and berries",
+  d: "Oats soaked overnight in milk or yogurt with a handful of berries. Grab it and go.",
+  c: ["dairy"],
+  e: 1,
+  $: 1,
+  l: "carb"
+}, {
+  ty: "breakfast",
+  n: "Peanut butter banana toast",
+  d: "Whole-grain toast, peanut butter, sliced banana. Two minutes, done.",
+  c: ["gluten", "nuts"],
+  e: 1,
+  $: 1,
+  l: "carb"
+}, {
+  ty: "breakfast",
+  n: "Eggs and toast",
+  d: "Two eggs any way, a slice of toast. Ready in five.",
+  c: ["egg", "gluten"],
+  e: 1,
+  $: 1,
+  l: "balanced"
+}, {
+  ty: "breakfast",
+  n: "Greek yogurt, fruit and seeds",
+  d: "A bowl of Greek yogurt with chopped fruit and a spoon of seeds.",
+  c: ["dairy"],
+  e: 1,
+  $: 2,
+  l: "protein"
+}, {
+  ty: "breakfast",
+  n: "Veggie omelette",
+  d: "Eggs with whatever veg is in the fridge and a little cheese.",
+  c: ["egg", "dairy"],
+  e: 2,
+  $: 2,
+  l: "protein"
+}, {
+  ty: "breakfast",
+  n: "Oatmeal with peanut butter",
+  d: "Oats cooked in water or plant milk, stirred through with peanut butter and banana.",
+  c: ["nuts"],
+  e: 1,
+  $: 1,
+  l: "carb"
+}, {
+  ty: "breakfast",
+  n: "Tofu scramble",
+  d: "Crumbled tofu cooked with turmeric and veg. Like scrambled eggs, plant-based.",
+  c: [],
+  e: 2,
+  $: 2,
+  l: "protein"
+}, {
+  ty: "breakfast",
+  n: "Green smoothie",
+  d: "Banana, a handful of spinach, oats, and water or plant milk. Blend and drink.",
+  c: [],
+  e: 1,
+  $: 1,
+  l: "balanced"
+}, {
+  ty: "breakfast",
+  n: "Beans on toast",
+  d: "Warm beans over toast. Cheap, filling, and quick.",
+  c: ["gluten"],
+  e: 1,
+  $: 1,
+  l: "balanced"
+}, {
+  ty: "breakfast",
+  n: "Cottage cheese and fruit",
+  d: "A tub of cottage cheese with berries or pineapple.",
+  c: ["dairy"],
+  e: 1,
+  $: 2,
+  l: "protein"
+},
+// lunch
+{
+  ty: "lunch",
+  n: "Chicken and rice bowl",
+  d: "Chicken, rice, and a pile of veg in a bowl.",
+  c: ["meat"],
+  e: 2,
+  $: 2,
+  l: "balanced"
+}, {
+  ty: "lunch",
+  n: "Tuna salad wrap",
+  d: "Tuna with a bit of mayo and salad, rolled in a wrap.",
+  c: ["fish", "gluten"],
+  e: 1,
+  $: 1,
+  l: "protein"
+}, {
+  ty: "lunch",
+  n: "Chickpea salad",
+  d: "Greens, chickpeas, whatever veg you've got, olive oil and lemon.",
+  c: [],
+  e: 1,
+  $: 1,
+  l: "balanced"
+}, {
+  ty: "lunch",
+  n: "Last night's leftovers",
+  d: "Yesterday's dinner, reheated. The easiest lunch there is.",
+  c: [],
+  e: 1,
+  $: 1,
+  l: "balanced"
+}, {
+  ty: "lunch",
+  n: "Lentil soup and bread",
+  d: "A bowl of lentil soup with bread to dip.",
+  c: ["gluten"],
+  e: 2,
+  $: 1,
+  l: "carb"
+}, {
+  ty: "lunch",
+  n: "Turkey and cheese sandwich",
+  d: "Turkey, cheese and salad on whole-grain bread.",
+  c: ["meat", "dairy", "gluten"],
+  e: 1,
+  $: 2,
+  l: "balanced"
+}, {
+  ty: "lunch",
+  n: "Rice and black bean bowl",
+  d: "Rice, black beans, salsa, and avocado if you've got it.",
+  c: [],
+  e: 1,
+  $: 1,
+  l: "carb"
+}, {
+  ty: "lunch",
+  n: "Salmon and salad",
+  d: "A fillet of salmon over a big salad.",
+  c: ["fish"],
+  e: 2,
+  $: 3,
+  l: "protein"
+}, {
+  ty: "lunch",
+  n: "Hummus and veg pita",
+  d: "Pita, hummus, cucumber, tomato, and a few olives.",
+  c: ["gluten"],
+  e: 1,
+  $: 1,
+  l: "balanced"
+}, {
+  ty: "lunch",
+  n: "Egg fried rice",
+  d: "Leftover rice fried up with an egg and frozen veg.",
+  c: ["egg"],
+  e: 2,
+  $: 1,
+  l: "carb"
+},
+// dinner
+{
+  ty: "dinner",
+  n: "Chicken and veg stir-fry",
+  d: "Chicken and vegetables in a hot pan, over rice or noodles.",
+  c: ["meat", "gluten"],
+  e: 2,
+  $: 2,
+  l: "balanced"
+}, {
+  ty: "dinner",
+  n: "Pasta with tomato and veg",
+  d: "Whole-grain pasta, a simple tomato sauce, extra veg stirred in.",
+  c: ["gluten"],
+  e: 2,
+  $: 1,
+  l: "carb"
+}, {
+  ty: "dinner",
+  n: "Baked salmon and potatoes",
+  d: "Salmon in the oven with roast potatoes and something green.",
+  c: ["fish"],
+  e: 2,
+  $: 3,
+  l: "protein"
+}, {
+  ty: "dinner",
+  n: "Bean chili",
+  d: "A pot of bean chili. Makes leftovers for tomorrow's lunch.",
+  c: [],
+  e: 2,
+  $: 1,
+  l: "balanced"
+}, {
+  ty: "dinner",
+  n: "Beef chili",
+  d: "Ground beef, beans, tomatoes and spices. Cook a big batch.",
+  c: ["meat"],
+  e: 2,
+  $: 2,
+  l: "protein"
+}, {
+  ty: "dinner",
+  n: "Tofu and veg curry",
+  d: "Tofu and veg simmered in a coconut curry, over rice.",
+  c: [],
+  e: 3,
+  $: 2,
+  l: "balanced"
+}, {
+  ty: "dinner",
+  n: "Roast chicken thighs and veg",
+  d: "Chicken thighs and chopped veg on one tray in the oven.",
+  c: ["meat"],
+  e: 2,
+  $: 2,
+  l: "protein"
+}, {
+  ty: "dinner",
+  n: "Sweet potato and bean tacos",
+  d: "Roast sweet potato and black beans in tortillas.",
+  c: [],
+  e: 2,
+  $: 1,
+  l: "carb"
+}, {
+  ty: "dinner",
+  n: "Shrimp and veg noodles",
+  d: "Shrimp and veg tossed through noodles.",
+  c: ["shellfish", "gluten"],
+  e: 2,
+  $: 2,
+  l: "balanced"
+}, {
+  ty: "dinner",
+  n: "Loaded baked potato",
+  d: "A baked potato with beans and a bit of cheese.",
+  c: ["dairy"],
+  e: 1,
+  $: 1,
+  l: "carb"
+}, {
+  ty: "dinner",
+  n: "Lentil dahl and rice",
+  d: "Red lentils cooked down with spices, over rice.",
+  c: [],
+  e: 2,
+  $: 1,
+  l: "carb"
+}, {
+  ty: "dinner",
+  n: "Omelette and salad",
+  d: "A big veg omelette with a side salad. Dinner in ten minutes.",
+  c: ["egg"],
+  e: 1,
+  $: 1,
+  l: "protein"
+},
+// snack
+{
+  ty: "snack",
+  n: "Apple and peanut butter",
+  d: "An apple with a spoon of peanut butter.",
+  c: ["nuts"],
+  e: 1,
+  $: 1,
+  l: "balanced"
+}, {
+  ty: "snack",
+  n: "Greek yogurt",
+  d: "A small tub of Greek yogurt.",
+  c: ["dairy"],
+  e: 1,
+  $: 1,
+  l: "protein"
+}, {
+  ty: "snack",
+  n: "Handful of nuts",
+  d: "A small handful of mixed nuts.",
+  c: ["nuts"],
+  e: 1,
+  $: 2,
+  l: "balanced"
+}, {
+  ty: "snack",
+  n: "Banana",
+  d: "A banana. The original grab-and-go.",
+  c: [],
+  e: 1,
+  $: 1,
+  l: "carb"
+}, {
+  ty: "snack",
+  n: "Hummus and carrots",
+  d: "Carrot sticks and a scoop of hummus.",
+  c: [],
+  e: 1,
+  $: 1,
+  l: "balanced"
+}, {
+  ty: "snack",
+  n: "Boiled eggs",
+  d: "A couple of eggs, boiled ahead of time.",
+  c: ["egg"],
+  e: 1,
+  $: 1,
+  l: "protein"
+}, {
+  ty: "snack",
+  n: "Edamame",
+  d: "A bowl of edamame with a pinch of salt.",
+  c: [],
+  e: 1,
+  $: 1,
+  l: "protein"
+}];
+const DIET_EXCLUDE = {
+  "Anything": [],
+  "Vegetarian": ["meat", "fish", "shellfish", "pork"],
+  "Vegan": ["meat", "fish", "shellfish", "pork", "dairy", "egg"],
+  "Pescatarian": ["meat", "pork"]
+};
+const AVOID_TOKEN = {
+  "Dairy": "dairy",
+  "Gluten": "gluten",
+  "Nuts": "nuts",
+  "Eggs": "egg",
+  "Shellfish": "shellfish",
+  "Pork": "pork"
+};
+function shuffle(a) {
+  const r = a.slice();
+  for (let i = r.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const t = r[i];
+    r[i] = r[j];
+    r[j] = t;
+  }
+  return r;
+}
+function mealPool(type, prefs) {
+  const excl = new Set([...(DIET_EXCLUDE[prefs.diet] || []), ...(prefs.avoid || []).map(a => AVOID_TOKEN[a]).filter(Boolean)]);
+  const maxE = {
+    "Barely any": 1,
+    "Some": 2,
+    "I like cooking": 3
+  }[prefs.cook] || 3;
+  const maxC = {
+    "Tight": 1,
+    "Normal": 2,
+    "Flexible": 3
+  }[prefs.budget] || 3;
+  let pool = MEAL_DB.filter(m => m.ty === type && !m.c.some(t => excl.has(t)) && m.e <= maxE && m.$ <= maxC);
+  if (pool.length < 3) pool = MEAL_DB.filter(m => m.ty === type && !m.c.some(t => excl.has(t))); // relax effort/budget if too tight
+  return pool;
+}
+function pickDinner(pool, dayType, used) {
+  const want = dayType === "rest" ? "protein" : "carb";
+  const fresh = pool.filter(m => !used.has(m.n));
+  const p = fresh.length ? fresh : pool;
+  const pref = p.filter(m => m.l === want);
+  const chosen = pref.length ? pref : p;
+  return chosen[Math.floor(Math.random() * chosen.length)];
+}
+function pick(pool, used) {
+  const fresh = pool.filter(m => !used.has(m.n));
+  const p = fresh.length ? fresh : pool;
+  return p[Math.floor(Math.random() * p.length)];
+}
+function genMealPlan(profile, prefs, dayTypes) {
+  const bPool = mealPool("breakfast", prefs),
+    lPool = mealPool("lunch", prefs),
+    dPool = mealPool("dinner", prefs),
+    sPool = mealPool("snack", prefs);
+  const dow = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const usedB = new Set(),
+    usedL = new Set(),
+    usedD = new Set(),
+    usedS = new Set();
+  const slim = m => m ? {
+    n: m.n,
+    d: m.d
+  } : null;
+  return dayTypes.map((ty, i) => {
+    const b = pick(bPool, usedB),
+      l = pick(lPool, usedL),
+      din = pickDinner(dPool, ty, usedD),
+      s = pick(sPool, usedS);
+    [[b, usedB], [l, usedL], [din, usedD], [s, usedS]].forEach(([m, set]) => {
+      if (m) set.add(m.n);
+      if (set.size >= Math.max(3, Math.floor(7 / 2))) set.clear();
+    });
+    return {
+      day: dow[i],
+      type: ty,
+      breakfast: slim(b),
+      lunch: slim(l),
+      dinner: slim(din),
+      snack: slim(s)
+    };
+  });
+}
+const DIET_OPTS = ["Anything", "Vegetarian", "Pescatarian", "Vegan"];
+const AVOID_OPTS = ["Dairy", "Gluten", "Nuts", "Eggs", "Shellfish", "Pork"];
+const COOK_OPTS = ["Barely any", "Some", "I like cooking"];
+const BUDGET_OPTS = ["Tight", "Normal", "Flexible"];
+function NutritionCoach({
+  C,
+  profile
+}) {
+  const [prefs, setPrefs] = useState(() => LS.get("coachmile_nutrition", null));
+  const [plan, setPlan] = useState(() => LS.get("coachmile_mealplan", null));
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState(() => prefs || {
+    diet: "Anything",
+    avoid: [],
+    cook: "Some",
+    budget: "Normal"
+  });
+  const dayTypes = weekPattern(profile, computeWeek(profile), LS.get("coachmile_swaps", {})).map(s => s === "run" ? "run" : s === "walk" ? "walk" : "rest");
+  const build = p => {
+    const np = genMealPlan(profile, p, dayTypes);
+    setPlan(np);
+    LS.set("coachmile_mealplan", np);
+    track("mealplan_built", {
+      diet: p.diet
+    });
+  };
+  const save = () => {
+    setPrefs(form);
+    LS.set("coachmile_nutrition", form);
+    build(form);
+    setEditing(false);
+    haptic();
+  };
+  const toggleAvoid = o => setForm(f => ({
+    ...f,
+    avoid: f.avoid.includes(o) ? f.avoid.filter(x => x !== o) : [...f.avoid, o]
+  }));
+  const Opt = ({
+    sel,
+    children,
+    onClick
+  }) => /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      haptic();
+      onClick();
+    },
+    style: {
+      padding: "9px 13px",
+      borderRadius: 11,
+      fontSize: 13,
+      border: "1.5px solid " + (sel ? C.orange : C.border),
+      background: sel ? C.orange + "14" : C.card,
+      color: sel ? C.orange : C.textPrimary
+    }
+  }, children);
+  if (editing || !prefs) {
+    return /*#__PURE__*/React.createElement("div", {
+      className: "card fu2 section-gap-sm"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "eyebrow",
+      style: {
+        marginBottom: 4
+      }
+    }, "Your nutrition coach"), /*#__PURE__*/React.createElement("div", {
+      className: "h-sec",
+      style: {
+        fontSize: 16,
+        marginBottom: 2
+      }
+    }, "Build your week of meals"), /*#__PURE__*/React.createElement("div", {
+      className: "muted",
+      style: {
+        fontSize: 12.5,
+        lineHeight: 1.5,
+        marginBottom: 14
+      }
+    }, "Answer four quick things and I'll plan seven days of meals around your runs. No counting, just what to eat."), /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 14
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "eyebrow",
+      style: {
+        marginBottom: 8
+      }
+    }, "How do you eat?"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        flexWrap: "wrap",
+        gap: 7
+      }
+    }, DIET_OPTS.map(o => /*#__PURE__*/React.createElement(Opt, {
+      key: o,
+      sel: form.diet === o,
+      onClick: () => setForm(f => ({
+        ...f,
+        diet: o
+      }))
+    }, o)))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 14
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "eyebrow",
+      style: {
+        marginBottom: 8
+      }
+    }, "Anything to leave out?"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        flexWrap: "wrap",
+        gap: 7
+      }
+    }, AVOID_OPTS.map(o => /*#__PURE__*/React.createElement(Opt, {
+      key: o,
+      sel: form.avoid.includes(o),
+      onClick: () => toggleAvoid(o)
+    }, o)))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 14
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "eyebrow",
+      style: {
+        marginBottom: 8
+      }
+    }, "Time to cook?"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        flexWrap: "wrap",
+        gap: 7
+      }
+    }, COOK_OPTS.map(o => /*#__PURE__*/React.createElement(Opt, {
+      key: o,
+      sel: form.cook === o,
+      onClick: () => setForm(f => ({
+        ...f,
+        cook: o
+      }))
+    }, o)))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 18
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "eyebrow",
+      style: {
+        marginBottom: 8
+      }
+    }, "Grocery budget?"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        flexWrap: "wrap",
+        gap: 7
+      }
+    }, BUDGET_OPTS.map(o => /*#__PURE__*/React.createElement(Opt, {
+      key: o,
+      sel: form.budget === o,
+      onClick: () => setForm(f => ({
+        ...f,
+        budget: o
+      }))
+    }, o)))), /*#__PURE__*/React.createElement("button", {
+      className: "btn-primary",
+      onClick: save
+    }, "Build my week"), prefs && /*#__PURE__*/React.createElement("button", {
+      className: "btn-soft",
+      onClick: () => {
+        setEditing(false);
+        setForm(prefs);
+      }
+    }, "Cancel"));
+  }
+  const dtColor = t => t === "run" ? C.orange : t === "walk" ? C.blue : C.textMuted;
+  const dtLabel = t => t === "run" ? "Run day" : t === "walk" ? "Walk day" : "Rest day";
+  return /*#__PURE__*/React.createElement("div", {
+    className: "card fu2 section-gap-sm"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+      marginBottom: 4
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "eyebrow",
+    style: {
+      marginBottom: 4
+    }
+  }, "Your nutrition coach"), /*#__PURE__*/React.createElement("div", {
+    className: "h-sec",
+    style: {
+      fontSize: 16
+    }
+  }, "This week's meals")), /*#__PURE__*/React.createElement("button", {
+    className: "mono",
+    style: {
+      fontSize: 12,
+      color: C.textMuted
+    },
+    onClick: () => {
+      setForm(prefs);
+      setEditing(true);
+    }
+  }, "Edit")), /*#__PURE__*/React.createElement("div", {
+    className: "muted",
+    style: {
+      fontSize: 12,
+      marginBottom: 12
+    }
+  }, prefs.diet, prefs.avoid.length ? ", no " + prefs.avoid.join("/").toLowerCase() : "", " · ", prefs.cook.toLowerCase(), " cooking · ", prefs.budget.toLowerCase(), " budget"), (plan || []).map((day, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    style: {
+      padding: "12px 0",
+      borderTop: i ? "1px solid " + C.borderSoft : "none"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 8
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontFamily: "'Space Grotesk',sans-serif",
+      fontWeight: 700,
+      fontSize: 14,
+      color: C.textPrimary
+    }
+  }, day.day), /*#__PURE__*/React.createElement("span", {
+    className: "mono",
+    style: {
+      fontSize: 9.5,
+      letterSpacing: ".06em",
+      textTransform: "uppercase",
+      color: dtColor(day.type),
+      background: dtColor(day.type) + "1A",
+      padding: "2px 7px",
+      borderRadius: 9
+    }
+  }, dtLabel(day.type)), day.type === "run" && /*#__PURE__*/React.createElement("span", {
+    className: "mono",
+    style: {
+      fontSize: 10,
+      color: C.textMuted
+    }
+  }, "carbs before, protein after")), [["Breakfast", day.breakfast], ["Lunch", day.lunch], ["Dinner", day.dinner], ["Snack", day.snack]].map(([lab, m]) => m && /*#__PURE__*/React.createElement("div", {
+    key: lab,
+    style: {
+      display: "flex",
+      gap: 10,
+      padding: "5px 0"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "mono",
+    style: {
+      fontSize: 9.5,
+      color: C.textMuted,
+      width: 62,
+      flexShrink: 0,
+      paddingTop: 2,
+      textTransform: "uppercase",
+      letterSpacing: ".04em"
+    }
+  }, lab), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13.5,
+      color: C.textPrimary,
+      fontWeight: 500
+    }
+  }, m.n), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11.5,
+      color: C.textMuted,
+      lineHeight: 1.45
+    }
+  }, m.d)))))), /*#__PURE__*/React.createElement("button", {
+    className: "btn-soft",
+    style: {
+      marginTop: 12
+    },
+    onClick: () => {
+      haptic();
+      build(prefs);
+    }
+  }, "Shuffle a new week"));
+}
 function NutritionLibrary({
   C,
   profile
@@ -3902,32 +4601,32 @@ function NutritionLibrary({
   const longSessions = (profile.timeAvailable || 30) >= 45;
   const TOPICS = [{
     icon: "⛽",
-    title: "Fuel your run (timing)",
-    body: ["Before: a small carb 60–90 min prior — banana, toast, or oats — tops off your energy. Skip heavy fat or fiber right before; they sit heavy.", "During: water covers most runs. Past about an hour, a few sips of something with a little sugar and salt keeps you going.", "After: within the hour, pair carbs + protein — yogurt and fruit, eggs and toast, or a shake — to refill and rebuild."]
+    title: "What to eat around a run",
+    body: ["Have a little something with carbs about an hour before you run. A banana or a slice of toast does it. Big fatty or high-fiber meals right beforehand tend to sit heavy, so save those for later.", "For most runs, water's all you need. If you're going longer than an hour, take a few sips of something with a bit of sugar and salt in it.", "Try to eat within an hour of finishing. Something with carbs and protein works well, like yogurt and fruit, or eggs on toast."]
   }, {
     icon: "🥚",
-    title: "Protein: your repair crew",
-    body: ["Aim for a palm-sized protein source at every meal. It rebuilds the muscle running breaks down and keeps you full for hours.", "Spread it across the day rather than one big hit — your body puts it to use better that way.", "Beginners almost always under-eat protein, not over. Eggs, Greek yogurt, beans, tofu, chicken, fish, and lentils all count."]
+    title: "Getting enough protein",
+    body: ["Aim for a palm-sized bit of protein at each meal. It's what helps you rebuild after runs, and it keeps you full for longer.", "Spread it through the day instead of loading it all into dinner. Your body uses it better that way.", "Most people starting out aren't eating enough of it, not too much. Eggs, yogurt, beans, tofu, chicken, fish and lentils all count."]
   }, {
     icon: "🍚",
-    title: "Carbs are fuel, not the enemy",
-    body: ["Carbs are your muscles' preferred fuel. Cut them too hard and every run starts to feel like a slog.", "Favor slow carbs — oats, rice, potatoes, whole grains, fruit — over sugary spikes that fade fast.", "Put your bigger carb servings around run days, when your legs will actually use them."]
+    title: "Carbs aren't the enemy",
+    body: ["Carbs are what your legs actually run on. Cut them too low and your runs start to feel awful.", "Go for the slower kind when you can. Oats, rice, potatoes and fruit last a lot longer than sugary stuff that spikes and then drops.", "Save your bigger carb meals for the days you're running."]
   }, {
     icon: "💧",
-    title: "Hydration & electrolytes",
-    body: ["Thirst lags behind need. The simplest daily gauge: aim for pale-yellow urine, not dark.", longSessions ? "Your sessions run 45+ minutes, so on hot or sweaty days add electrolytes — a pinch of salt and a splash of juice, or an electrolyte tab." : "Plain water covers your current sessions. Only reach for electrolytes on unusually long or sweaty days.", "Caffeine is fine and can even sharpen a run — just not so late it steals the sleep where recovery actually happens."]
+    title: "Water and electrolytes",
+    body: ["You're usually a step behind your thirst. Easiest check going: your pee should be pale, not dark.", longSessions ? "Your runs are 45 minutes or more, so on hot or sweaty days it's worth adding electrolytes. A pinch of salt and a splash of juice does the job, or grab an electrolyte tab." : "Plain water covers your runs right now. You only really need electrolytes on the long or sweaty ones.", "Coffee's fine, and it can even help your run. Just don't have it so late that it wrecks your sleep, since that's when you actually recover."]
   }, {
     icon: "🩸",
-    title: female ? "Iron & the minerals women runners miss" : "Iron & the minerals runners miss",
-    body: ["Iron carries oxygen, and runners — especially women — often run low and feel it as unexplained fatigue. Pair iron foods (lentils, spinach, red meat) with vitamin C (peppers, citrus) to absorb far more.", ...(female && phase === "Menstrual" ? ["You're in your menstrual phase right now — a good week to lean extra into iron-rich meals."] : []), "Calcium and vitamin D protect the bones your treadmill work is busy strengthening — dairy, fortified plant milk, and a little sunlight.", "Magnesium — nuts, seeds, and leafy greens — supports muscle recovery and deeper sleep."]
+    title: female ? "Iron and the minerals women runners miss" : "Iron and the minerals runners miss",
+    body: ["Iron helps carry oxygen around your body, and runners run low on it more than most, women especially. It shows up as being tired for no clear reason. Eat iron foods like lentils, spinach or red meat alongside something high in vitamin C, like peppers or citrus, and you'll absorb a lot more of it.", ...(female && phase === "Menstrual" ? ["You're on your period this week, so it's a good time to lean into iron-rich meals."] : []), "Calcium and vitamin D keep your bones strong while you're running on them. Dairy, fortified plant milk, and a bit of sun all help.", "Magnesium helps you recover and sleep better. You'll find it in nuts, seeds and leafy greens."]
   }, {
     icon: "🔁",
-    title: "Smart swaps that stick",
-    body: ["Trade one sugary drink a day for sparkling water and lime. It's the single highest-leverage change most people can make.", "Go whole where it's easy: brown rice sometimes, whole-grain bread, oats instead of sugary cereal.", "Make the fried side the exception, not the default — extra veg or a baked option most of the time.", "Keep every swap small enough that you'll still be doing it in six months."]
+    title: "Swaps that actually stick",
+    body: ["Trade one sugary drink a day for sparkling water with a squeeze of lime. It's probably the easiest big win there is.", "Go whole-grain when it's no extra hassle. Brown rice some nights, whole-grain bread, oats instead of sugary cereal.", "Make the fries the exception, not the default. Most of the time, grab extra veg or something baked instead.", "Keep the swaps small. If you can't picture yourself still doing it in six months, it's too big."]
   }, {
     icon: "🍽️",
     title: "Eat to your hunger, not the clock",
-    body: ["Before eating, rate your hunger 1–10. Aim to start around 3–4 and stop around 6–7 — satisfied, not stuffed.", "Fullness signals lag about ten minutes behind the fork. Slow down, and seconds often turn out to be unnecessary.", "This beats counting anything — and unlike a diet, it's a skill you keep for life."]
+    body: ["Before you eat, ask how hungry you actually are, one to ten. Start eating around a three or four, and stop around a six or seven. That's satisfied, not stuffed.", "It takes about ten minutes to feel full. Slow down a bit and you'll often find you don't want seconds after all.", "It beats counting anything, and it's a skill you keep for good."]
   }];
   return /*#__PURE__*/React.createElement("div", {
     className: "card fu4 section-gap-sm"
@@ -3949,7 +4648,7 @@ function NutritionLibrary({
       lineHeight: 1.5,
       marginBottom: 10
     }
-  }, "Evidence-based, no calorie counting. Tap a topic to open it."), TOPICS.map((t, i) => {
+  }, "Straight talk on food. No calorie counting. Tap a topic to open it."), TOPICS.map((t, i) => {
     const isOpen = open === i;
     return /*#__PURE__*/React.createElement("div", {
       key: i,
@@ -4091,7 +4790,10 @@ function FoodScreen({
       lineHeight: 1.55,
       marginTop: 6
     }
-  }, tipFor())), /*#__PURE__*/React.createElement("div", {
+  }, tipFor())), /*#__PURE__*/React.createElement(NutritionCoach, {
+    C: C,
+    profile: profile
+  }), /*#__PURE__*/React.createElement("div", {
     className: "card fu3 section-gap-sm"
   }, /*#__PURE__*/React.createElement("div", {
     style: {
