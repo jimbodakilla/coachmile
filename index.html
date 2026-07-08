@@ -562,6 +562,10 @@ function makeCSS(C, simplified) {
 .day-ovl-tag{padding:7px 15px;border-radius:20px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);font-size:13px;color:rgba(255,255,255,.72);}
 .day-ovl-share{width:100%;max-width:300px;padding:18px;border-radius:18px;background:${C.orange};border:none;font-family:${HEAD};font-weight:700;font-size:18px;color:#fff;cursor:pointer;letter-spacing:-.01em;}
 .day-ovl-share:active{opacity:.82;}
+.day-ovl-img-wrap{width:100%;max-width:320px;margin-bottom:14px;border-radius:18px;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,.55);}
+.day-ovl-img{width:100%;display:block;-webkit-touch-callout:default;}
+.day-ovl-hint{font-size:12px;color:rgba(255,255,255,.45);margin-bottom:20px;text-align:center;padding:0 8px;line-height:1.5;}
+.day-ovl-back{background:none;border:none;color:rgba(255,255,255,.4);font-size:14px;cursor:pointer;margin-top:14px;padding:8px 16px;}
 
 /* full-plan overview */
 .pv-toggle{display:flex;gap:6px;background:${C.cardAlt};border:1px solid ${C.border};border-radius:12px;padding:4px;margin-bottom:14px;}
@@ -6765,7 +6769,7 @@ function calcHistCals(c, profile) {
     : 0.2 * speedMpm + 0.9 * speedMpm * grade + 3.5;
   return Math.round((vo2 * weightKg * 5 / 1000) * c.minutes);
 }
-function shareDayCard(c, profile, C) {
+function shareDayCard(c, profile, C, setShareImg) {
   try {
     const cv = document.createElement('canvas');
     cv.width = 1080; cv.height = 1080;
@@ -6824,21 +6828,8 @@ function shareDayCard(c, profile, C) {
         o.stop(ac.currentTime + i * 0.1 + 0.3);
       });
     } catch (_) {}
-    // share via native sheet (saves to Photos on iOS) or fall back to download
-    const filename = 'coachmile-' + (c.date || 'run') + '.png';
-    cv.toBlob(blob => {
-      const file = new File([blob], filename, { type: 'image/png' });
-      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-        navigator.share({ files: [file], title: 'CoachMile Workout' })
-          .catch(e => { if (e.name !== 'AbortError') console.warn('share error', e); });
-      } else {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = filename;
-        document.body.appendChild(a); a.click(); a.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-      }
-    }, 'image/png');
+    // store data URL synchronously — iOS gesture context stays alive for the Share button click
+    if (typeof setShareImg === 'function') setShareImg(cv.toDataURL('image/png'));
   } catch (e) { console.warn('share failed', e); }
 }
 function ProgressScreen({
@@ -6886,6 +6877,7 @@ function ProgressScreen({
   const histRows = showAllHist ? [...cks].reverse() : [...cks].reverse().slice(0, 8);
   const [calYM, setCalYM] = React.useState(() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() }; });
   const [calDetail, setCalDetail] = React.useState(null);
+  const [shareImg, setShareImg] = React.useState(null);
   const monthCks = useMemo(() => {
     const prefix = String(calYM.y) + '-' + String(calYM.m + 1).padStart(2, '0');
     return cks.filter(c => c.date && c.date.startsWith(prefix));
@@ -7431,34 +7423,62 @@ function ProgressScreen({
   }, "Close")))
   , calDetail && /*#__PURE__*/React.createElement("div", {className: "day-ovl", role: "dialog", "aria-modal": "true", "aria-label": "Workout detail"},
     /*#__PURE__*/React.createElement("div", {className: "day-ovl-top"},
-      /*#__PURE__*/React.createElement("button", {className: "day-ovl-close", onClick: () => setCalDetail(null), "aria-label": "Close"}, "×")
+      /*#__PURE__*/React.createElement("button", {className: "day-ovl-close", onClick: () => { setCalDetail(null); setShareImg(null); }, "aria-label": "Close"}, "×")
     ),
-    /*#__PURE__*/React.createElement("div", {className: "day-ovl-body"},
-      /*#__PURE__*/React.createElement("div", {className: "day-ovl-date"}, calDetail.date ? calDetail.date.replace(/-/g, ' / ') : ""),
-      /*#__PURE__*/React.createElement("div", {className: "day-ovl-ttl"}, calDetail.title || "Workout"),
-      !profile.bodyNeutral && calcHistCals(calDetail, profile) != null && /*#__PURE__*/React.createElement(React.Fragment, null,
-        /*#__PURE__*/React.createElement("div", {className: "day-ovl-hero"}, calcHistCals(calDetail, profile)),
-        /*#__PURE__*/React.createElement("div", {className: "day-ovl-hero-lab"}, "Calories burned")
-      ),
-      /*#__PURE__*/React.createElement("div", {className: "day-ovl-stats"},
-        /*#__PURE__*/React.createElement("div", {className: "day-ovl-stat"},
-          /*#__PURE__*/React.createElement("div", {className: "day-ovl-stat-n"}, calDetail.miles != null ? uDistN(calDetail.miles, profile) : "—"),
-          /*#__PURE__*/React.createElement("div", {className: "day-ovl-stat-l"}, uDistU(profile))
-        ),
-        /*#__PURE__*/React.createElement("div", {className: "day-ovl-stat"},
-          /*#__PURE__*/React.createElement("div", {className: "day-ovl-stat-n"}, calDetail.minutes || 0),
-          /*#__PURE__*/React.createElement("div", {className: "day-ovl-stat-l"}, "Min")
-        ),
-        calDetail.miles && calDetail.minutes && /*#__PURE__*/React.createElement("div", {className: "day-ovl-stat"},
-          /*#__PURE__*/React.createElement("div", {className: "day-ovl-stat-n"}, paceFromRun(calDetail.minutes, calDetail.miles, profile)),
-          /*#__PURE__*/React.createElement("div", {className: "day-ovl-stat-l"}, "Pace")
+    shareImg
+      ? /*#__PURE__*/React.createElement("div", {className: "day-ovl-body"},
+          /*#__PURE__*/React.createElement("div", {className: "day-ovl-img-wrap"},
+            /*#__PURE__*/React.createElement("img", {className: "day-ovl-img", src: shareImg, alt: "Workout card"})
+          ),
+          /*#__PURE__*/React.createElement("div", {className: "day-ovl-hint"}, "Press & hold image → Save to Photos"),
+          /*#__PURE__*/React.createElement("button", {
+            className: "day-ovl-share",
+            onClick: () => {
+              haptic();
+              try {
+                const arr = shareImg.split(',');
+                const bstr = atob(arr[1]);
+                let n = bstr.length;
+                const u8 = new Uint8Array(n);
+                while (n--) u8[n] = bstr.charCodeAt(n);
+                const blob = new Blob([u8], {type: 'image/png'});
+                const fname = 'coachmile-' + (calDetail.date || 'run') + '.png';
+                const file = new File([blob], fname, {type: 'image/png'});
+                if (navigator.share && navigator.canShare && navigator.canShare({files: [file]})) {
+                  navigator.share({files: [file], title: 'CoachMile Workout'})
+                    .catch(function(e) { if (e.name !== 'AbortError') console.warn('share', e); });
+                }
+              } catch(e) { console.warn('share error', e); }
+            }
+          }, "Share to..."),
+          /*#__PURE__*/React.createElement("button", {className: "day-ovl-back", onClick: () => setShareImg(null)}, "← Back")
         )
-      ),
-      [calDetail.mood && ("Mood: " + calDetail.mood), calDetail.energy && ("Energy: " + calDetail.energy), calDetail.soreness && ("After: " + calDetail.soreness)].filter(Boolean).length > 0 && /*#__PURE__*/React.createElement("div", {className: "day-ovl-tags"},
-        [calDetail.mood && ("Mood: " + calDetail.mood), calDetail.energy && ("Energy: " + calDetail.energy), calDetail.soreness && ("After: " + calDetail.soreness)].filter(Boolean).map((t, i) => /*#__PURE__*/React.createElement("div", {key: i, className: "day-ovl-tag"}, t))
-      ),
-      /*#__PURE__*/React.createElement("button", {className: "day-ovl-share", onClick: () => { haptic(); shareDayCard(calDetail, profile, C); }}, "Save & Share")
-    )
+      : /*#__PURE__*/React.createElement("div", {className: "day-ovl-body"},
+          /*#__PURE__*/React.createElement("div", {className: "day-ovl-date"}, calDetail.date ? calDetail.date.replace(/-/g, ' / ') : ""),
+          /*#__PURE__*/React.createElement("div", {className: "day-ovl-ttl"}, calDetail.title || "Workout"),
+          !profile.bodyNeutral && calcHistCals(calDetail, profile) != null && /*#__PURE__*/React.createElement(React.Fragment, null,
+            /*#__PURE__*/React.createElement("div", {className: "day-ovl-hero"}, calcHistCals(calDetail, profile)),
+            /*#__PURE__*/React.createElement("div", {className: "day-ovl-hero-lab"}, "Calories burned")
+          ),
+          /*#__PURE__*/React.createElement("div", {className: "day-ovl-stats"},
+            /*#__PURE__*/React.createElement("div", {className: "day-ovl-stat"},
+              /*#__PURE__*/React.createElement("div", {className: "day-ovl-stat-n"}, calDetail.miles != null ? uDistN(calDetail.miles, profile) : "—"),
+              /*#__PURE__*/React.createElement("div", {className: "day-ovl-stat-l"}, uDistU(profile))
+            ),
+            /*#__PURE__*/React.createElement("div", {className: "day-ovl-stat"},
+              /*#__PURE__*/React.createElement("div", {className: "day-ovl-stat-n"}, calDetail.minutes || 0),
+              /*#__PURE__*/React.createElement("div", {className: "day-ovl-stat-l"}, "Min")
+            ),
+            calDetail.miles && calDetail.minutes && /*#__PURE__*/React.createElement("div", {className: "day-ovl-stat"},
+              /*#__PURE__*/React.createElement("div", {className: "day-ovl-stat-n"}, paceFromRun(calDetail.minutes, calDetail.miles, profile)),
+              /*#__PURE__*/React.createElement("div", {className: "day-ovl-stat-l"}, "Pace")
+            )
+          ),
+          [calDetail.mood && ("Mood: " + calDetail.mood), calDetail.energy && ("Energy: " + calDetail.energy), calDetail.soreness && ("After: " + calDetail.soreness)].filter(Boolean).length > 0 && /*#__PURE__*/React.createElement("div", {className: "day-ovl-tags"},
+            [calDetail.mood && ("Mood: " + calDetail.mood), calDetail.energy && ("Energy: " + calDetail.energy), calDetail.soreness && ("After: " + calDetail.soreness)].filter(Boolean).map((t, i) => /*#__PURE__*/React.createElement("div", {key: i, className: "day-ovl-tag"}, t))
+          ),
+          /*#__PURE__*/React.createElement("button", {className: "day-ovl-share", onClick: () => { haptic(); shareDayCard(calDetail, profile, C, setShareImg); }}, "Save & Share")
+        )
   ));
 }
 
