@@ -6809,10 +6809,35 @@ function shareDayCard(c, profile, C) {
     ctx.fillStyle = C.orange || '#FF6B2C';
     ctx.font = 'bold 30px monospace';
     ctx.fillText('#CoachMile', 540, 988);
-    const a = document.createElement('a');
-    a.download = 'coachmile-' + (c.date || 'run') + '.png';
-    a.href = cv.toDataURL('image/png');
-    a.click();
+    // play success chime
+    try {
+      const ac = new (window.AudioContext || window.webkitAudioContext)();
+      [523, 659, 784].forEach((hz, i) => {
+        const o = ac.createOscillator(), g = ac.createGain();
+        o.connect(g); g.connect(ac.destination);
+        o.frequency.value = hz; o.type = 'sine';
+        g.gain.setValueAtTime(0, ac.currentTime + i * 0.1);
+        g.gain.linearRampToValueAtTime(0.18, ac.currentTime + i * 0.1 + 0.03);
+        g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + i * 0.1 + 0.28);
+        o.start(ac.currentTime + i * 0.1);
+        o.stop(ac.currentTime + i * 0.1 + 0.3);
+      });
+    } catch (_) {}
+    // share via native sheet (saves to Photos on iOS) or fall back to download
+    const filename = 'coachmile-' + (c.date || 'run') + '.png';
+    cv.toBlob(blob => {
+      const file = new File([blob], filename, { type: 'image/png' });
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+        navigator.share({ files: [file], title: 'CoachMile Workout' })
+          .catch(e => { if (e.name !== 'AbortError') console.warn('share error', e); });
+      } else {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = filename;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+    }, 'image/png');
   } catch (e) { console.warn('share failed', e); }
 }
 function ProgressScreen({
