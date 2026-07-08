@@ -562,6 +562,18 @@ function makeCSS(C, simplified) {
 .day-ovl-tag{padding:7px 15px;border-radius:20px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);font-size:13px;color:rgba(255,255,255,.72);}
 .day-ovl-share{width:100%;max-width:300px;padding:18px;border-radius:18px;background:${C.orange};border:none;font-family:${HEAD};font-weight:700;font-size:18px;color:#fff;cursor:pointer;letter-spacing:-.01em;}
 .day-ovl-share:active{opacity:.82;}
+.day-ovl-img-wrap{width:100%;max-width:320px;margin-bottom:14px;border-radius:18px;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,.55);}
+.day-ovl-img{width:100%;display:block;-webkit-touch-callout:default;}
+.day-ovl-hint{font-size:12px;color:rgba(255,255,255,.45);margin-bottom:20px;text-align:center;padding:0 8px;line-height:1.5;}
+.day-ovl-back{background:none;border:none;color:rgba(255,255,255,.4);font-size:14px;cursor:pointer;margin-top:14px;padding:8px 16px;}
+.day-ovl-ivs{width:100%;max-width:360px;margin-bottom:24px;border-radius:14px;overflow:hidden;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);}
+.day-ovl-iv{display:grid;grid-template-columns:1fr auto auto auto;gap:0;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.06);align-items:center;}
+.day-ovl-iv:last-child{border-bottom:none;}
+.day-ovl-iv-name{font-size:13px;color:rgba(255,255,255,.8);font-weight:600;}
+.day-ovl-iv-val{font-family:'IBM Plex Mono',monospace;font-size:11px;color:rgba(255,255,255,.45);text-align:right;padding-left:10px;white-space:nowrap;}
+.day-ovl-iv-dot{width:7px;height:7px;border-radius:50%;margin-right:8px;flex-shrink:0;}
+.day-ovl-iv-head{display:grid;grid-template-columns:1fr auto auto auto;gap:0;padding:7px 14px;background:rgba(255,255,255,.05);}
+.day-ovl-iv-hcol{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.3);text-align:right;padding-left:10px;}
 
 /* full-plan overview */
 .pv-toggle{display:flex;gap:6px;background:${C.cardAlt};border:1px solid ${C.border};border-radius:12px;padding:4px;margin-bottom:14px;}
@@ -3791,18 +3803,25 @@ function WorkoutMode({
   const halfFiredRef = useRef(false);
   const [cadenceOn, setCadenceOn] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
-  // #7 mid-run manual speed adjust (session-wide offset, mph)
+  // #7 mid-run manual speed + incline adjust (session-wide offsets, 0.5 steps)
   const [spdAdj, setSpdAdj] = useState(0);
   const spdAdjRef = useRef(0);
-  // effort guardrail — warn once when crossing a big-jump threshold scaled to ability
+  const [incAdj, setIncAdj] = useState(0);
+  const incAdjRef = useRef(0);
   const beginner = profile.runningAbility === "Can't run yet" || profile.runningAbility === "I run a little";
-  const jumpCap = beginner ? 0.6 : 1.2;
+  const jumpCap = beginner ? 1.0 : 2.0;
   const bumpSpeed = dv => setSpdAdj(v => {
-    const nv = +Math.max(-2, Math.min(2, v + dv)).toFixed(1);
+    const nv = +Math.max(-3, Math.min(3, v + dv)).toFixed(1);
     if (dv > 0 && nv >= jumpCap && v < jumpCap) {
       if (!confirm("You're picking the pace up a fair bit. Only go faster if it still feels controlled. Keep going?")) return v;
     }
     spdAdjRef.current = nv;
+    haptic();
+    return nv;
+  });
+  const bumpIncline = dv => setIncAdj(v => {
+    const nv = +Math.max(-4, Math.min(15, v + dv)).toFixed(1);
+    incAdjRef.current = nv;
     haptic();
     return nv;
   });
@@ -3843,6 +3862,26 @@ function WorkoutMode({
         cueCtxRef.current = null;
       }
     } catch (e) {}
+  }, []);
+  // iOS Safari requires AudioContext to be created/resumed inside a user gesture.
+  // Unlock it on the very first tap anywhere so setInterval callbacks can play sound.
+  useEffect(() => {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    const unlock = () => {
+      try {
+        if (!cueCtxRef.current) cueCtxRef.current = new AC();
+        if (cueCtxRef.current.state === 'suspended') cueCtxRef.current.resume();
+      } catch (e) {}
+      document.removeEventListener('touchstart', unlock, true);
+      document.removeEventListener('click', unlock, true);
+    };
+    document.addEventListener('touchstart', unlock, true);
+    document.addEventListener('click', unlock, true);
+    return () => {
+      document.removeEventListener('touchstart', unlock, true);
+      document.removeEventListener('click', unlock, true);
+    };
   }, []);
   const hrZone = hr == null ? null : (() => {
     const max = 220 - (profile.age || 35),
@@ -4080,6 +4119,7 @@ function WorkoutMode({
   const iv = intervals[curIdx];
   const phaseColor = ivColor(C, iv.type);
   const effSpeed = Math.max(0, (iv.speed || 0) + spdAdj);
+  const effIncline = Math.max(0, (iv.incline || 0) + incAdj);
   const mm = String(Math.floor(displaySecs / 60)).padStart(2, "0");
   const ss = String(Math.max(0, displaySecs % 60)).padStart(2, "0");
   const rpe = RPE_TABLE[iv.type] || RPE_DEFAULT;
@@ -4187,7 +4227,7 @@ function WorkoutMode({
     cals: calcCals(),
     minutes: Math.round(elapsedRef.current / 60),
     miles: finalMiles,
-    intervals: intervals.length,
+    ivData: intervals,
     title: day.title,
     wtype: day.type,
     planKey: day.planKey,
@@ -4487,7 +4527,7 @@ function WorkoutMode({
     className: "tread-cell"
   }, /*#__PURE__*/React.createElement("div", {
     className: "tread-n"
-  }, (iv.incline || 0).toFixed(1)), /*#__PURE__*/React.createElement("div", {
+  }, effIncline.toFixed(1)), /*#__PURE__*/React.createElement("div", {
     className: "tread-l"
   }, "Incline %")), /*#__PURE__*/React.createElement("div", {
     className: "tread-cell"
@@ -4501,59 +4541,82 @@ function WorkoutMode({
   }, isMetric(profile) ? "Km" : "Miles"))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
+      flexDirection: "column",
       alignItems: "center",
-      justifyContent: "center",
-      gap: 18,
+      gap: 10,
       marginTop: 8
     }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {display:"flex", alignItems:"center", justifyContent:"center", gap: 14}
   }, /*#__PURE__*/React.createElement("button", {
     "aria-label": "Slow down",
-    onClick: () => bumpSpeed(-0.1),
+    onClick: () => bumpSpeed(-0.5),
     style: {
-      width: 64,
-      height: 64,
+      width: 60,
+      height: 60,
       borderRadius: "50%",
       background: C.card,
       border: "1.5px solid " + C.border,
       color: C.textPrimary,
-      fontSize: 30,
+      fontSize: 28,
       fontWeight: 700
     }
   }, "−"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      minWidth: 96,
-      textAlign: "center"
-    }
+    style: {minWidth: 110, textAlign: "center"}
   }, /*#__PURE__*/React.createElement("div", {
     className: "mono",
-    style: {
-      fontSize: 9.5,
-      color: C.textMuted,
-      letterSpacing: ".08em",
-      textTransform: "uppercase"
-    }
-  }, "Adjust speed"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontFamily: "'Space Grotesk',sans-serif",
-      fontWeight: 700,
-      fontSize: 20,
-      color: spdAdj === 0 ? C.textMuted : C.orange,
-      letterSpacing: "-.01em"
-    }
-  }, (spdAdj > 0 ? "+" : "") + spdAdj.toFixed(1), " mph")), /*#__PURE__*/React.createElement("button", {
+    style: {fontSize: 9.5, color: C.textMuted, letterSpacing: ".08em", textTransform: "uppercase"}
+  }, "Speed — set to"), /*#__PURE__*/React.createElement("div", {
+    style: {fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 22, color: C.orange, letterSpacing: "-.01em"}
+  }, isMetric(profile) ? (effSpeed * 1.60934).toFixed(1) + " km/h" : effSpeed.toFixed(1) + " mph")), /*#__PURE__*/React.createElement("button", {
     "aria-label": "Speed up",
-    onClick: () => bumpSpeed(0.1),
+    onClick: () => bumpSpeed(0.5),
     style: {
-      width: 64,
-      height: 64,
+      width: 60,
+      height: 60,
       borderRadius: "50%",
       background: C.card,
       border: "1.5px solid " + C.border,
       color: C.textPrimary,
-      fontSize: 30,
+      fontSize: 28,
       fontWeight: 700
     }
-  }, "+")), /*#__PURE__*/React.createElement("button", {
+  }, "+")), /*#__PURE__*/React.createElement("div", {
+    style: {display:"flex", alignItems:"center", justifyContent:"center", gap: 14}
+  }, /*#__PURE__*/React.createElement("button", {
+    "aria-label": "Lower incline",
+    onClick: () => bumpIncline(-0.5),
+    style: {
+      width: 60,
+      height: 60,
+      borderRadius: "50%",
+      background: C.card,
+      border: "1.5px solid " + C.border,
+      color: C.textPrimary,
+      fontSize: 28,
+      fontWeight: 700
+    }
+  }, "−"), /*#__PURE__*/React.createElement("div", {
+    style: {minWidth: 110, textAlign: "center"}
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "mono",
+    style: {fontSize: 9.5, color: C.textMuted, letterSpacing: ".08em", textTransform: "uppercase"}
+  }, "Incline — set to"), /*#__PURE__*/React.createElement("div", {
+    style: {fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, fontSize: 22, color: incAdj === 0 ? C.textPrimary : C.orange, letterSpacing: "-.01em"}
+  }, effIncline.toFixed(1) + " %")), /*#__PURE__*/React.createElement("button", {
+    "aria-label": "Raise incline",
+    onClick: () => bumpIncline(0.5),
+    style: {
+      width: 60,
+      height: 60,
+      borderRadius: "50%",
+      background: C.card,
+      border: "1.5px solid " + C.border,
+      color: C.textPrimary,
+      fontSize: 28,
+      fontWeight: 700
+    }
+  }, "+"))), /*#__PURE__*/React.createElement("button", {
     "aria-expanded": showDetails,
     onClick: () => {
       haptic();
@@ -6765,18 +6828,21 @@ function calcHistCals(c, profile) {
     : 0.2 * speedMpm + 0.9 * speedMpm * grade + 3.5;
   return Math.round((vo2 * weightKg * 5 / 1000) * c.minutes);
 }
-function shareDayCard(c, profile, C) {
+function shareDayCard(c, profile, C, setShareImg) {
   try {
+    const ivs = Array.isArray(c.ivData) ? c.ivData : [];
+    const hasIvs = ivs.length > 0;
+    const W = 1080, H = hasIvs ? 1350 : 1080;
     const cv = document.createElement('canvas');
-    cv.width = 1080; cv.height = 1080;
+    cv.width = W; cv.height = H;
     const ctx = cv.getContext('2d');
     ctx.fillStyle = '#0D0D12';
-    ctx.fillRect(0, 0, 1080, 1080);
-    const grd = ctx.createRadialGradient(540, 400, 0, 540, 400, 520);
-    grd.addColorStop(0, (C.orange || '#FF6B2C') + '28');
+    ctx.fillRect(0, 0, W, H);
+    const grd = ctx.createRadialGradient(540, 360, 0, 540, 360, 520);
+    grd.addColorStop(0, (C.orange || '#FF6B2C') + '22');
     grd.addColorStop(1, 'transparent');
     ctx.fillStyle = grd;
-    ctx.fillRect(0, 0, 1080, 1080);
+    ctx.fillRect(0, 0, W, H);
     ctx.textAlign = 'center';
     ctx.fillStyle = 'rgba(255,255,255,0.38)';
     ctx.font = '32px monospace';
@@ -6787,29 +6853,53 @@ function shareDayCard(c, profile, C) {
     const kcal = calcHistCals(c, profile);
     if (!profile.bodyNeutral && kcal != null) {
       ctx.fillStyle = C.orange || '#FF6B2C';
-      ctx.font = 'bold 270px sans-serif';
-      ctx.fillText(String(kcal), 540, 530);
+      ctx.font = 'bold 200px sans-serif';
+      ctx.fillText(String(kcal), 540, 460);
       ctx.fillStyle = 'rgba(255,255,255,0.36)';
-      ctx.font = 'bold 34px monospace';
-      ctx.fillText('CALORIES BURNED', 540, 596);
+      ctx.font = 'bold 30px monospace';
+      ctx.fillText('CALORIES BURNED', 540, 516);
     }
     const mi = c.miles || 0;
     const mn = c.minutes || 0;
     const dist = uDistN(mi, profile) + ' ' + uDistU(profile);
     const pace = mi && mn ? paceFromRun(mn, mi, profile) : '--';
     const stats = [[dist, 'DISTANCE'], [mn + ' min', 'TIME'], [pace, 'PACE']];
-    const sw = 1080 / stats.length;
+    const sw = W / stats.length;
     stats.forEach(([v, l], i) => {
       ctx.fillStyle = '#fff';
-      ctx.font = 'bold 58px sans-serif';
-      ctx.fillText(v, sw * i + sw / 2, 720);
+      ctx.font = 'bold 50px sans-serif';
+      ctx.fillText(v, sw * i + sw / 2, 640);
       ctx.fillStyle = 'rgba(255,255,255,0.38)';
-      ctx.font = 'bold 22px monospace';
-      ctx.fillText(l, sw * i + sw / 2, 762);
+      ctx.font = 'bold 20px monospace';
+      ctx.fillText(l, sw * i + sw / 2, 678);
     });
+    if (hasIvs) {
+      const typeColors = {run:'#FF6B2C', walk:'#3B9EFF', warmup:'#A0A0A0', cool:'#9BBBCC', strength:'#B06DFF'};
+      const rowH = 56, startY = 730, padX = 60;
+      ctx.fillStyle = 'rgba(255,255,255,0.05)';
+      ctx.beginPath(); ctx.roundRect(padX, startY - 10, W - padX*2, 46, 10); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.font = 'bold 20px monospace'; ctx.textAlign = 'left';
+      ctx.fillText('SEGMENT', padX + 40, startY + 22);
+      ctx.textAlign = 'right';
+      ['MIN','MPH','INCL%'].forEach((h, i) => ctx.fillText(h, W - padX - i*130, startY + 22));
+      ivs.forEach((iv, i) => {
+        const y = startY + 46 + i * rowH;
+        if (i % 2 === 0) { ctx.fillStyle = 'rgba(255,255,255,0.03)'; ctx.fillRect(padX, y, W - padX*2, rowH); }
+        const dot = typeColors[iv.type] || '#888';
+        ctx.fillStyle = dot; ctx.beginPath(); ctx.arc(padX + 20, y + rowH/2, 7, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.82)'; ctx.font = '28px sans-serif'; ctx.textAlign = 'left';
+        ctx.fillText(iv.name || iv.type, padX + 40, y + rowH/2 + 10);
+        ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.font = '26px monospace'; ctx.textAlign = 'right';
+        ctx.fillText(String(iv.duration || 0), W - padX - 260, y + rowH/2 + 10);
+        ctx.fillText(iv.speed != null ? iv.speed.toFixed(1) : '—', W - padX - 130, y + rowH/2 + 10);
+        ctx.fillText(iv.incline != null ? iv.incline.toFixed(1) : '0.0', W - padX, y + rowH/2 + 10);
+      });
+    }
+    const tagY = hasIvs ? H - 56 : 988;
     ctx.fillStyle = C.orange || '#FF6B2C';
-    ctx.font = 'bold 30px monospace';
-    ctx.fillText('#CoachMile', 540, 988);
+    ctx.font = 'bold 28px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('#CoachMile', 540, tagY);
     // play success chime
     try {
       const ac = new (window.AudioContext || window.webkitAudioContext)();
@@ -6824,21 +6914,8 @@ function shareDayCard(c, profile, C) {
         o.stop(ac.currentTime + i * 0.1 + 0.3);
       });
     } catch (_) {}
-    // share via native sheet (saves to Photos on iOS) or fall back to download
-    const filename = 'coachmile-' + (c.date || 'run') + '.png';
-    cv.toBlob(blob => {
-      const file = new File([blob], filename, { type: 'image/png' });
-      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-        navigator.share({ files: [file], title: 'CoachMile Workout' })
-          .catch(e => { if (e.name !== 'AbortError') console.warn('share error', e); });
-      } else {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = filename;
-        document.body.appendChild(a); a.click(); a.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-      }
-    }, 'image/png');
+    // store data URL synchronously — iOS gesture context stays alive for the Share button click
+    if (typeof setShareImg === 'function') setShareImg(cv.toDataURL('image/png'));
   } catch (e) { console.warn('share failed', e); }
 }
 function ProgressScreen({
@@ -6886,6 +6963,7 @@ function ProgressScreen({
   const histRows = showAllHist ? [...cks].reverse() : [...cks].reverse().slice(0, 8);
   const [calYM, setCalYM] = React.useState(() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() }; });
   const [calDetail, setCalDetail] = React.useState(null);
+  const [shareImg, setShareImg] = React.useState(null);
   const monthCks = useMemo(() => {
     const prefix = String(calYM.y) + '-' + String(calYM.m + 1).padStart(2, '0');
     return cks.filter(c => c.date && c.date.startsWith(prefix));
@@ -7431,34 +7509,83 @@ function ProgressScreen({
   }, "Close")))
   , calDetail && /*#__PURE__*/React.createElement("div", {className: "day-ovl", role: "dialog", "aria-modal": "true", "aria-label": "Workout detail"},
     /*#__PURE__*/React.createElement("div", {className: "day-ovl-top"},
-      /*#__PURE__*/React.createElement("button", {className: "day-ovl-close", onClick: () => setCalDetail(null), "aria-label": "Close"}, "×")
+      /*#__PURE__*/React.createElement("button", {className: "day-ovl-close", onClick: () => { setCalDetail(null); setShareImg(null); }, "aria-label": "Close"}, "×")
     ),
-    /*#__PURE__*/React.createElement("div", {className: "day-ovl-body"},
-      /*#__PURE__*/React.createElement("div", {className: "day-ovl-date"}, calDetail.date ? calDetail.date.replace(/-/g, ' / ') : ""),
-      /*#__PURE__*/React.createElement("div", {className: "day-ovl-ttl"}, calDetail.title || "Workout"),
-      !profile.bodyNeutral && calcHistCals(calDetail, profile) != null && /*#__PURE__*/React.createElement(React.Fragment, null,
-        /*#__PURE__*/React.createElement("div", {className: "day-ovl-hero"}, calcHistCals(calDetail, profile)),
-        /*#__PURE__*/React.createElement("div", {className: "day-ovl-hero-lab"}, "Calories burned")
-      ),
-      /*#__PURE__*/React.createElement("div", {className: "day-ovl-stats"},
-        /*#__PURE__*/React.createElement("div", {className: "day-ovl-stat"},
-          /*#__PURE__*/React.createElement("div", {className: "day-ovl-stat-n"}, calDetail.miles != null ? uDistN(calDetail.miles, profile) : "—"),
-          /*#__PURE__*/React.createElement("div", {className: "day-ovl-stat-l"}, uDistU(profile))
-        ),
-        /*#__PURE__*/React.createElement("div", {className: "day-ovl-stat"},
-          /*#__PURE__*/React.createElement("div", {className: "day-ovl-stat-n"}, calDetail.minutes || 0),
-          /*#__PURE__*/React.createElement("div", {className: "day-ovl-stat-l"}, "Min")
-        ),
-        calDetail.miles && calDetail.minutes && /*#__PURE__*/React.createElement("div", {className: "day-ovl-stat"},
-          /*#__PURE__*/React.createElement("div", {className: "day-ovl-stat-n"}, paceFromRun(calDetail.minutes, calDetail.miles, profile)),
-          /*#__PURE__*/React.createElement("div", {className: "day-ovl-stat-l"}, "Pace")
+    shareImg
+      ? /*#__PURE__*/React.createElement("div", {className: "day-ovl-body"},
+          /*#__PURE__*/React.createElement("div", {className: "day-ovl-img-wrap"},
+            /*#__PURE__*/React.createElement("img", {className: "day-ovl-img", src: shareImg, alt: "Workout card"})
+          ),
+          /*#__PURE__*/React.createElement("div", {className: "day-ovl-hint"}, "Press & hold image → Save to Photos"),
+          /*#__PURE__*/React.createElement("button", {
+            className: "day-ovl-share",
+            onClick: () => {
+              haptic();
+              try {
+                const arr = shareImg.split(',');
+                const bstr = atob(arr[1]);
+                let n = bstr.length;
+                const u8 = new Uint8Array(n);
+                while (n--) u8[n] = bstr.charCodeAt(n);
+                const blob = new Blob([u8], {type: 'image/png'});
+                const fname = 'coachmile-' + (calDetail.date || 'run') + '.png';
+                const file = new File([blob], fname, {type: 'image/png'});
+                if (navigator.share && navigator.canShare && navigator.canShare({files: [file]})) {
+                  navigator.share({files: [file], title: 'CoachMile Workout'})
+                    .catch(function(e) { if (e.name !== 'AbortError') console.warn('share', e); });
+                }
+              } catch(e) { console.warn('share error', e); }
+            }
+          }, "Share to..."),
+          /*#__PURE__*/React.createElement("button", {className: "day-ovl-back", onClick: () => setShareImg(null)}, "← Back")
         )
-      ),
-      [calDetail.mood && ("Mood: " + calDetail.mood), calDetail.energy && ("Energy: " + calDetail.energy), calDetail.soreness && ("After: " + calDetail.soreness)].filter(Boolean).length > 0 && /*#__PURE__*/React.createElement("div", {className: "day-ovl-tags"},
-        [calDetail.mood && ("Mood: " + calDetail.mood), calDetail.energy && ("Energy: " + calDetail.energy), calDetail.soreness && ("After: " + calDetail.soreness)].filter(Boolean).map((t, i) => /*#__PURE__*/React.createElement("div", {key: i, className: "day-ovl-tag"}, t))
-      ),
-      /*#__PURE__*/React.createElement("button", {className: "day-ovl-share", onClick: () => { haptic(); shareDayCard(calDetail, profile, C); }}, "Save & Share")
-    )
+      : /*#__PURE__*/React.createElement("div", {className: "day-ovl-body"},
+          /*#__PURE__*/React.createElement("div", {className: "day-ovl-date"}, calDetail.date ? calDetail.date.replace(/-/g, ' / ') : ""),
+          /*#__PURE__*/React.createElement("div", {className: "day-ovl-ttl"}, calDetail.title || "Workout"),
+          !profile.bodyNeutral && calcHistCals(calDetail, profile) != null && /*#__PURE__*/React.createElement(React.Fragment, null,
+            /*#__PURE__*/React.createElement("div", {className: "day-ovl-hero"}, calcHistCals(calDetail, profile)),
+            /*#__PURE__*/React.createElement("div", {className: "day-ovl-hero-lab"}, "Calories burned")
+          ),
+          /*#__PURE__*/React.createElement("div", {className: "day-ovl-stats"},
+            /*#__PURE__*/React.createElement("div", {className: "day-ovl-stat"},
+              /*#__PURE__*/React.createElement("div", {className: "day-ovl-stat-n"}, calDetail.miles != null ? uDistN(calDetail.miles, profile) : "—"),
+              /*#__PURE__*/React.createElement("div", {className: "day-ovl-stat-l"}, uDistU(profile))
+            ),
+            /*#__PURE__*/React.createElement("div", {className: "day-ovl-stat"},
+              /*#__PURE__*/React.createElement("div", {className: "day-ovl-stat-n"}, calDetail.minutes || 0),
+              /*#__PURE__*/React.createElement("div", {className: "day-ovl-stat-l"}, "Min")
+            ),
+            calDetail.miles && calDetail.minutes && /*#__PURE__*/React.createElement("div", {className: "day-ovl-stat"},
+              /*#__PURE__*/React.createElement("div", {className: "day-ovl-stat-n"}, paceFromRun(calDetail.minutes, calDetail.miles, profile)),
+              /*#__PURE__*/React.createElement("div", {className: "day-ovl-stat-l"}, "Pace")
+            )
+          ),
+          [calDetail.mood && ("Mood: " + calDetail.mood), calDetail.energy && ("Energy: " + calDetail.energy), calDetail.soreness && ("After: " + calDetail.soreness)].filter(Boolean).length > 0 && /*#__PURE__*/React.createElement("div", {className: "day-ovl-tags"},
+            [calDetail.mood && ("Mood: " + calDetail.mood), calDetail.energy && ("Energy: " + calDetail.energy), calDetail.soreness && ("After: " + calDetail.soreness)].filter(Boolean).map((t, i) => /*#__PURE__*/React.createElement("div", {key: i, className: "day-ovl-tag"}, t))
+          ),
+          calDetail.ivData && calDetail.ivData.length > 0 && /*#__PURE__*/React.createElement("div", {className: "day-ovl-ivs"},
+            /*#__PURE__*/React.createElement("div", {className: "day-ovl-iv-head"},
+              /*#__PURE__*/React.createElement("div", {className: "day-ovl-iv-hcol", style:{textAlign:"left"}}, "Segment"),
+              /*#__PURE__*/React.createElement("div", {className: "day-ovl-iv-hcol"}, "Min"),
+              /*#__PURE__*/React.createElement("div", {className: "day-ovl-iv-hcol"}, "MPH"),
+              /*#__PURE__*/React.createElement("div", {className: "day-ovl-iv-hcol"}, "Incl%")
+            ),
+            calDetail.ivData.map((iv, i) => {
+              const typeColors = {run: "#FF6B2C", walk: "#3B9EFF", warmup: "#A0A0A0", cool: "#A0A0A0", strength: "#B06DFF"};
+              const dot = typeColors[iv.type] || "#888";
+              return /*#__PURE__*/React.createElement("div", {key: i, className: "day-ovl-iv"},
+                /*#__PURE__*/React.createElement("div", {style:{display:"flex",alignItems:"center"}},
+                  /*#__PURE__*/React.createElement("div", {className: "day-ovl-iv-dot", style:{background:dot}}),
+                  /*#__PURE__*/React.createElement("div", {className: "day-ovl-iv-name"}, iv.name || iv.type)
+                ),
+                /*#__PURE__*/React.createElement("div", {className: "day-ovl-iv-val"}, iv.duration || 0),
+                /*#__PURE__*/React.createElement("div", {className: "day-ovl-iv-val"}, iv.speed != null ? iv.speed.toFixed(1) : "—"),
+                /*#__PURE__*/React.createElement("div", {className: "day-ovl-iv-val"}, iv.incline != null ? iv.incline.toFixed(1) : "0.0")
+              );
+            })
+          ),
+          /*#__PURE__*/React.createElement("button", {className: "day-ovl-share", onClick: () => { haptic(); shareDayCard(calDetail, profile, C, setShareImg); }}, "Save & Share")
+        )
   ));
 }
 
@@ -8590,7 +8717,8 @@ function App() {
         elev: res.elev,
         title: res.title,
         wtype: res.wtype,
-        planKey: res.planKey
+        planKey: res.planKey,
+        ivData: res.ivData
       };
       const nc = [...checkins, entry];
       setCheckins(nc);
