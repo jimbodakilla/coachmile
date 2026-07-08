@@ -6752,6 +6752,18 @@ function RunnerStats({
     }
   }, mi)))));
 }
+function calcHistCals(c, profile) {
+  if (!c.miles || !c.minutes || c.minutes <= 0) return c.cals != null ? c.cals : null;
+  const weightKg = (profile.currentWeight || 170) / 2.2046;
+  const speedMph = Math.max(0.5, (c.miles / c.minutes) * 60);
+  const speedMpm = speedMph * 26.82;
+  // derive average grade from stored elevation gain (feet)
+  const grade = (c.elev && c.miles) ? Math.min(0.25, c.elev / (c.miles * 5280)) : 0;
+  const vo2 = speedMph < 3.7
+    ? 0.1 * speedMpm + 1.8 * speedMpm * grade + 3.5
+    : 0.2 * speedMpm + 0.9 * speedMpm * grade + 3.5;
+  return Math.round((vo2 * weightKg * 5 / 1000) * c.minutes);
+}
 function shareDayCard(c, profile, C) {
   try {
     const cv = document.createElement('canvas');
@@ -6771,10 +6783,11 @@ function shareDayCard(c, profile, C) {
     ctx.fillStyle = 'rgba(255,255,255,0.88)';
     ctx.font = 'bold 52px sans-serif';
     ctx.fillText(c.title || 'Workout', 540, 186);
-    if (!profile.bodyNeutral && c.cals != null) {
+    const kcal = calcHistCals(c, profile);
+    if (!profile.bodyNeutral && kcal != null) {
       ctx.fillStyle = C.orange || '#FF6B2C';
       ctx.font = 'bold 270px sans-serif';
-      ctx.fillText(String(c.cals), 540, 530);
+      ctx.fillText(String(kcal), 540, 530);
       ctx.fillStyle = 'rgba(255,255,255,0.36)';
       ctx.font = 'bold 34px monospace';
       ctx.fillText('CALORIES BURNED', 540, 596);
@@ -6860,7 +6873,7 @@ function ProgressScreen({
     s: monthCks.length,
     mi: monthCks.reduce((a, c) => a + (c.miles || 0), 0),
     mn: monthCks.reduce((a, c) => a + (c.minutes || 0), 0),
-    kcal: monthCks.reduce((a, c) => a + (c.cals || 0), 0)
+    kcal: monthCks.reduce((a, c) => a + (calcHistCals(c, profile) || 0), 0)
   }), [monthCks]);
   const calCells = useMemo(() => {
     const firstDow = new Date(calYM.y, calYM.m, 1).getDay();
@@ -7214,7 +7227,7 @@ function ProgressScreen({
     className: "hist-t"
   }, c.title || "Run"), /*#__PURE__*/React.createElement("div", {
     className: "hist-meta"
-  }, c.miles != null ? uDistN(c.miles, profile) + " " + uDistU(profile) + " · " : "", c.minutes || 0, " min", c.miles && c.minutes ? " · " + paceFromRun(c.minutes, c.miles, profile) : "", c.cals && !profile.bodyNeutral ? " · " + c.cals + " kcal" : "")), /*#__PURE__*/React.createElement("div", {
+  }, c.miles != null ? uDistN(c.miles, profile) + " " + uDistU(profile) + " · " : "", c.minutes || 0, " min", c.miles && c.minutes ? " · " + paceFromRun(c.minutes, c.miles, profile) : "", !profile.bodyNeutral && calcHistCals(c, profile) != null ? " · " + calcHistCals(c, profile) + " kcal" : "")), /*#__PURE__*/React.createElement("div", {
     className: "hist-mood",
     title: "Felt " + (c.mood || "")
   }, c.mood || ""), /*#__PURE__*/React.createElement("div", {
@@ -7364,7 +7377,7 @@ function ProgressScreen({
       letterSpacing: ".06em",
       marginTop: 2
     }
-  }, l))), !profile.bodyNeutral && detail.cals != null && /*#__PURE__*/React.createElement("div", {
+  }, l))), !profile.bodyNeutral && calcHistCals(detail, profile) != null && /*#__PURE__*/React.createElement("div", {
     style: {
       background: C.cardAlt,
       borderRadius: 12,
@@ -7377,7 +7390,7 @@ function ProgressScreen({
       fontSize: 18,
       color: C.textPrimary
     }
-  }, detail.cals, " kcal"), /*#__PURE__*/React.createElement("div", {
+  }, calcHistCals(detail, profile), " kcal"), /*#__PURE__*/React.createElement("div", {
     className: "mono",
     style: {
       fontSize: 10,
@@ -7397,8 +7410,8 @@ function ProgressScreen({
     /*#__PURE__*/React.createElement("div", {className: "day-ovl-body"},
       /*#__PURE__*/React.createElement("div", {className: "day-ovl-date"}, calDetail.date ? calDetail.date.replace(/-/g, ' / ') : ""),
       /*#__PURE__*/React.createElement("div", {className: "day-ovl-ttl"}, calDetail.title || "Workout"),
-      !profile.bodyNeutral && calDetail.cals != null && /*#__PURE__*/React.createElement(React.Fragment, null,
-        /*#__PURE__*/React.createElement("div", {className: "day-ovl-hero"}, calDetail.cals),
+      !profile.bodyNeutral && calcHistCals(calDetail, profile) != null && /*#__PURE__*/React.createElement(React.Fragment, null,
+        /*#__PURE__*/React.createElement("div", {className: "day-ovl-hero"}, calcHistCals(calDetail, profile)),
         /*#__PURE__*/React.createElement("div", {className: "day-ovl-hero-lab"}, "Calories burned")
       ),
       /*#__PURE__*/React.createElement("div", {className: "day-ovl-stats"},
