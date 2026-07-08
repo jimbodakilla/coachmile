@@ -654,23 +654,23 @@ function makeCSS(C, simplified) {
 .gen-step{font-family:${MONO};font-size:12px;color:${C.textMuted};letter-spacing:.05em;min-height:18px;}
 
 .wk-full{position:fixed;inset:0;background:${C.bg};z-index:60;display:flex;flex-direction:column;max-width:430px;margin:0 auto;overflow:hidden;}
-.wk-head{display:flex;align-items:center;justify-content:space-between;padding:20px 22px 8px;}
-.wk-phase-lab{font-family:${MONO};font-size:12px;letter-spacing:.14em;text-transform:uppercase;}
-.wk-x{font-size:22px;color:${C.textMuted};width:38px;height:38px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:${C.card};}
-.wk-body{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px 26px;position:relative;}
-.wk-timer{font-family:${HEAD};font-weight:700;font-size:90px;line-height:1;letter-spacing:-.03em;}
-.wk-cur{font-family:${HEAD};font-weight:700;font-size:30px;margin-bottom:4px;letter-spacing:-.01em;}
-.wk-rpe{font-size:13px;color:${C.textSecondary};text-align:center;margin-top:14px;line-height:1.5;max-width:290px;}
+.wk-head{display:flex;align-items:center;justify-content:space-between;padding:18px 22px 6px;}
+.wk-phase-lab{font-family:${MONO};font-size:13px;letter-spacing:.16em;text-transform:uppercase;font-weight:700;}
+.wk-x{font-size:22px;color:${C.textMuted};width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:${C.card};}
+.wk-body{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px 22px;position:relative;}
+.wk-timer{font-family:${HEAD};font-weight:700;font-size:clamp(96px,26vw,140px);line-height:1;letter-spacing:-.04em;margin:2px 0;}
+.wk-cur{font-family:${MONO};font-size:12px;margin-bottom:6px;letter-spacing:.1em;text-transform:uppercase;opacity:.7;}
+.wk-rpe{font-size:12px;color:${C.textSecondary};text-align:center;margin-top:8px;line-height:1.4;max-width:260px;}
 .wk-rpe b{color:${C.textPrimary};}
-.breathe-dot{width:64px;height:64px;border-radius:50%;background:${C.blue};animation:breathe 5s ease-in-out infinite;margin:20px auto 4px;}
+.breathe-dot{width:56px;height:56px;border-radius:50%;background:${C.blue};animation:breathe 5s ease-in-out infinite;margin:14px auto 4px;}
 .breathe-lab{font-family:${MONO};font-size:11px;color:${C.textMuted};letter-spacing:.1em;text-align:center;}
-.tread-row{display:flex;gap:12px;margin:18px 0 4px;}
-.tread-cell{background:${C.card};border:1px solid ${C.border};border-radius:13px;padding:11px 18px;text-align:center;min-width:96px;}
-.tread-n{font-family:${HEAD};font-weight:700;font-size:22px;color:${C.textPrimary};}
-.tread-l{font-size:10px;color:${C.textMuted};font-family:${MONO};letter-spacing:.06em;text-transform:uppercase;margin-top:2px;}
+.tread-row{display:flex;gap:10px;margin:14px 0 4px;}
+.tread-cell{background:${C.card};border:1px solid ${C.border};border-radius:14px;padding:12px 16px;text-align:center;min-width:92px;flex:1;}
+.tread-n{font-family:${HEAD};font-weight:700;font-size:26px;color:${C.textPrimary};}
+.tread-l{font-size:10px;color:${C.textMuted};font-family:${MONO};letter-spacing:.06em;text-transform:uppercase;margin-top:3px;}
 .emerg{background:${C.red}16;border:1px solid ${C.red}44;color:${C.red};border-radius:12px;padding:11px 14px;font-size:12px;text-align:center;margin:0 22px;line-height:1.4;}
-.wk-strip{display:flex;gap:4px;padding:14px 22px 8px;}
-.strip-seg{flex:1;height:6px;border-radius:4px;background:${C.border};overflow:hidden;}
+.wk-strip{display:flex;gap:4px;padding:12px 22px 6px;}
+.strip-seg{flex:1;height:5px;border-radius:4px;background:${C.border};overflow:hidden;}
 .strip-fill{height:100%;border-radius:4px;}
 .wk-ctrls{display:flex;gap:12px;padding:8px 22px calc(24px + env(safe-area-inset-bottom));}
 .ctrl-pause{flex:1;background:${C.card};border:1.5px solid ${C.border};color:${C.textPrimary};font-family:${HEAD};font-weight:700;font-size:17px;padding:21px 16px;border-radius:16px;min-height:64px;}
@@ -688,13 +688,17 @@ function makeCSS(C, simplified) {
 .dot.on{background:${C.green};}
 .dot.cur{background:${C.orange};transform:scale(1.3);}
 
-.done-full{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px 26px calc(30px + env(safe-area-inset-bottom));max-width:430px;margin:0 auto;text-align:center;gap:6px;background:${C.bg};}
-.done-ring{width:96px;height:96px;border-radius:50%;background:${C.green}1A;border:3px solid ${C.green};display:flex;align-items:center;justify-content:center;font-size:46px;margin-bottom:8px;}
-.done-title{font-family:${HEAD};font-weight:700;font-size:32px;color:${C.textPrimary};letter-spacing:-.02em;}
-.done-stats{display:flex;gap:12px;margin:22px 0;width:100%;}
-.done-stat{flex:1;background:${C.card};border:1px solid ${C.border};border-radius:14px;padding:16px 8px;box-shadow:${cardShadow};}
-.done-stat .n{font-family:${HEAD};font-weight:700;font-size:24px;color:${C.orange};}
-.done-stat .l{font-size:10px;color:${C.textMuted};font-family:${MONO};letter-spacing:.05em;text-transform:uppercase;margin-top:3px;}
+.done-full{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:36px 26px calc(36px + env(safe-area-inset-bottom));max-width:430px;margin:0 auto;text-align:center;gap:0;background:${C.bg};position:relative;}
+.done-glow{position:absolute;top:-60px;left:50%;transform:translateX(-50%);width:320px;height:320px;border-radius:50%;background:radial-gradient(circle,${C.green}18 0%,transparent 70%);pointer-events:none;}
+.done-ring{width:110px;height:110px;border-radius:50%;background:linear-gradient(135deg,${C.green}28,${C.green}08);border:3px solid ${C.green};display:flex;align-items:center;justify-content:center;font-size:52px;margin-bottom:16px;box-shadow:0 0 40px ${C.green}30;}
+.done-title{font-family:${HEAD};font-weight:700;font-size:38px;color:${C.textPrimary};letter-spacing:-.03em;margin-bottom:6px;}
+.done-hero{font-family:${HEAD};font-weight:700;font-size:clamp(72px,20vw,96px);line-height:1;letter-spacing:-.04em;color:${C.orange};margin:20px 0 0;}
+.done-hero-lab{font-family:${MONO};font-size:12px;color:${C.textMuted};letter-spacing:.14em;text-transform:uppercase;margin-bottom:20px;}
+.done-stats{display:flex;gap:10px;margin:0 0 22px;width:100%;}
+.done-stat{flex:1;background:${C.card};border:1px solid ${C.border};border-radius:16px;padding:16px 8px;box-shadow:${cardShadow};}
+.done-stat .n{font-family:${HEAD};font-weight:700;font-size:26px;color:${C.textPrimary};}
+.done-stat .l{font-size:10px;color:${C.textMuted};font-family:${MONO};letter-spacing:.05em;text-transform:uppercase;margin-top:4px;}
+.done-msg{font-size:14px;color:${C.textSecondary};max-width:280px;line-height:1.55;margin-bottom:24px;}
 
 .sheet-scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:70;display:flex;align-items:flex-end;justify-content:center;animation:fadeIn .2s ease;}
 .sheet{width:100%;max-width:430px;background:${C.surface};border-radius:26px 26px 0 0;border-top:1px solid ${C.border};padding:22px 22px calc(26px + env(safe-area-inset-bottom));animation:slideUp .28s cubic-bezier(.2,.8,.2,1);}
@@ -3254,7 +3258,7 @@ function BodyweightMode({
   const doneCount = (round - 1) * circuit.exercises.length + exIdx;
   const ex = circuit.exercises[exIdx];
   const estMin = day.totalMin || circuit.mins || 20;
-  const cals = Math.round(estMin * ((profile.currentWeight || 170) * 0.00095) * 8);
+  const cals = Math.round(estMin * ((profile.currentWeight || 170) / 2.2046) * 5 / 60);
   const ciDone = ci.energy && ci.soreness && ci.mood;
   useEffect(() => {
     if (phase !== "rest") return;
@@ -3748,6 +3752,8 @@ function WorkoutMode({
   const wakeRef = useRef(null);
   const cueCtxRef = useRef(null);
   const metroRef = useRef(null);
+  const lastBeepRef = useRef(0);
+  const halfFiredRef = useRef(false);
   const [cadenceOn, setCadenceOn] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   // #7 mid-run manual speed adjust (session-wide offset, mph)
@@ -3870,6 +3876,34 @@ function WorkoutMode({
       });
     } catch (e) {}
   };
+  // countdown beep — high pitch for 3/2, even higher for 1
+  const playCountdownBeep = n => {
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      const ac = cueCtxRef.current || (cueCtxRef.current = new AC());
+      if (ac.state === "suspended") ac.resume();
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.type = "sine";
+      o.frequency.value = n === 1 ? 1318 : 880;
+      o.connect(g); g.connect(ac.destination);
+      const t = ac.currentTime;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(n === 1 ? 0.35 : 0.2, t + 0.015);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + (n === 1 ? 0.18 : 0.12));
+      o.start(t); o.stop(t + 0.2);
+    } catch (e) {}
+  };
+  // spoken prompt via speechSynthesis
+  const speak = text => {
+    try {
+      if (!window.speechSynthesis) return;
+      const u = new SpeechSynthesisUtterance(text);
+      u.rate = 1.05; u.volume = 0.9; u.pitch = 1.0;
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(u);
+    } catch (e) {}
+  };
   // #2 audio + haptic cue on interval transition
   const cue = type => {
     try {
@@ -3942,6 +3976,10 @@ function WorkoutMode({
         setDisplaySecs(intervals[ni].duration * 60);
         setElapsed(Math.floor(elapsedRef.current));
         cue(intervals[ni].type);
+        lastBeepRef.current = 0;
+        const ivt = intervals[ni].type;
+        const phrase = ivt === "run" ? "Go! Run now." : ivt === "walk" ? "Walk. Recover." : ivt === "cool" ? "Cool down. Nearly there." : ivt === "warmup" ? "Warm up. Easy does it." : "Keep going.";
+        setTimeout(() => speak(phrase), 600);
         persistActive({
           idx: ni,
           completedSecs: completedSecsRef.current,
@@ -3951,7 +3989,17 @@ function WorkoutMode({
       }
       elapsedRef.current = completedSecsRef.current + segEl;
       distRef.current = completedDistRef.current + spd * segEl / 3600;
-      setDisplaySecs(Math.max(0, Math.ceil(curDur - segEl)));
+      const remaining = Math.max(0, Math.ceil(curDur - segEl));
+      if (remaining <= 3 && remaining > 0 && remaining !== lastBeepRef.current && idxRef.current < intervals.length - 1) {
+        lastBeepRef.current = remaining;
+        playCountdownBeep(remaining);
+      }
+      const totalPlan = intervals.reduce((s, iv) => s + iv.duration * 60, 0);
+      if (!halfFiredRef.current && elapsedRef.current >= totalPlan * 0.5 && totalPlan > 0) {
+        halfFiredRef.current = true;
+        setTimeout(() => speak("Halfway there. You are doing great."), 400);
+      }
+      setDisplaySecs(remaining);
       setElapsed(Math.floor(elapsedRef.current));
     }, 250);
     return () => {
@@ -4078,7 +4126,24 @@ function WorkoutMode({
       return i + 1;
     });
   };
-  const calcCals = () => Math.round(elapsedRef.current / 60 * ((profile.currentWeight || 170) * 0.00095) * 11);
+  const calcCals = () => {
+    const mins = elapsedRef.current / 60;
+    const weightKg = (profile.currentWeight || 170) / 2.2046;
+    let totalCalMin = 0, totalDur = 0;
+    for (const iv of intervals) {
+      const dur = iv.duration || 1;
+      const speedMph = Math.max(0.5, iv.speed || 3.0);
+      const grade = (iv.incline || 0) / 100;
+      const speedMpm = speedMph * 26.82;
+      const vo2 = speedMph < 3.7
+        ? 0.1 * speedMpm + 1.8 * speedMpm * grade + 3.5
+        : 0.2 * speedMpm + 0.9 * speedMpm * grade + 3.5;
+      totalCalMin += (vo2 * weightKg * 5 / 1000) * dur;
+      totalDur += dur;
+    }
+    const avgCalPerMin = totalDur > 0 ? totalCalMin / totalDur : 8;
+    return Math.round(avgCalPerMin * mins);
+  };
   const finishPayload = () => ({
     checkin: {
       ...ci,
@@ -4375,15 +4440,7 @@ function WorkoutMode({
     }
   }), /*#__PURE__*/React.createElement("div", {
     className: "breathe-lab"
-  }, "BREATHE WITH THE CIRCLE · IN … OUT")), voiceLine && /*#__PURE__*/React.createElement("div", {
-    className: "wk-voice",
-    style: {
-      color: phaseColor
-    },
-    role: "status"
-  }, voiceLine), /*#__PURE__*/React.createElement(EffortCue, {
-    rpe: rpe
-  }), /*#__PURE__*/React.createElement("div", {
+  }, "BREATHE")), /*#__PURE__*/React.createElement("div", {
     className: "tread-row"
   }, /*#__PURE__*/React.createElement("div", {
     className: "tread-cell"
@@ -4407,15 +4464,6 @@ function WorkoutMode({
   }, uDistN(liveDist, profile)), /*#__PURE__*/React.createElement("div", {
     className: "tread-l"
   }, isMetric(profile) ? "Km" : "Miles"))), /*#__PURE__*/React.createElement("div", {
-    className: "mono",
-    style: {
-      fontSize: 11,
-      color: C.textMuted,
-      textAlign: "center",
-      marginTop: 12,
-      letterSpacing: ".04em"
-    }
-  }, "SET YOUR BELT TO THIS · THE − / + JUST KEEPS YOUR NUMBERS HONEST"), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "center",
@@ -4598,28 +4646,58 @@ function CompletionScreen({
       cv.width = 1080;
       cv.height = 1080;
       const x = cv.getContext('2d');
-      const g = x.createLinearGradient(0, 0, 1080, 1080);
-      g.addColorStop(0, '#FF6B35');
-      g.addColorStop(1, '#A78BFA');
-      x.fillStyle = g;
+      // dark background with radial glow
+      x.fillStyle = '#0D0D12';
       x.fillRect(0, 0, 1080, 1080);
+      const glow = x.createRadialGradient(540, 420, 0, 540, 420, 560);
+      glow.addColorStop(0, 'rgba(255,107,53,.22)');
+      glow.addColorStop(0.5, 'rgba(167,139,250,.10)');
+      glow.addColorStop(1, 'transparent');
+      x.fillStyle = glow;
+      x.fillRect(0, 0, 1080, 1080);
+      // decorative ring
+      x.strokeStyle = 'rgba(255,107,53,.18)';
+      x.lineWidth = 2;
+      x.beginPath(); x.arc(540, 420, 360, 0, Math.PI * 2); x.stroke();
+      x.strokeStyle = 'rgba(167,139,250,.10)';
+      x.lineWidth = 1;
+      x.beginPath(); x.arc(540, 420, 420, 0, Math.PI * 2); x.stroke();
       x.textAlign = 'center';
+      // brand mark
+      x.fillStyle = 'rgba(255,255,255,.45)';
+      x.font = '500 28px "IBM Plex Mono",monospace';
+      x.fillText('COACHMILE', 540, 100);
+      // hero distance
+      x.fillStyle = '#FF6B35';
+      x.font = '800 260px "Space Grotesk",sans-serif';
+      x.fillText((miles || 0).toFixed(2), 540, 580);
+      x.fillStyle = 'rgba(255,255,255,.55)';
+      x.font = '600 36px "IBM Plex Mono",monospace';
+      x.fillText('MILES', 540, 648);
+      // divider
+      x.strokeStyle = 'rgba(255,255,255,.12)';
+      x.lineWidth = 1;
+      x.beginPath(); x.moveTo(200, 700); x.lineTo(880, 700); x.stroke();
+      // stats row
       x.fillStyle = '#fff';
-      x.font = '700 60px "Space Grotesk",sans-serif';
-      x.fillText('CoachMile', 540, 170);
-      x.font = '700 42px "Space Grotesk",sans-serif';
-      x.fillText('Session Complete', 540, 240);
-      x.font = '800 240px "Space Grotesk",sans-serif';
-      x.fillText((miles || 0).toFixed(2), 540, 610);
-      x.font = '600 46px "Inter",sans-serif';
-      x.fillText('MILES', 540, 685);
-      x.font = '600 40px "Inter",sans-serif';
-      x.fillText(minutes + ' min   ·   ' + cals + ' kcal   ·   ' + intervals + ' intervals', 540, 800);
-      x.fillStyle = 'rgba(255,255,255,.92)';
-      x.font = '400 38px "Inter",sans-serif';
-      x.fillText((profile.name || 'A runner') + ' is one mile closer.', 540, 930);
-      x.font = '600 32px "IBM Plex Mono",monospace';
-      x.fillText('#CoachMile', 540, 1000);
+      x.font = '700 52px "Space Grotesk",sans-serif';
+      x.textAlign = 'left';
+      x.fillText(minutes, 220, 790);
+      x.fillText(cals, 540, 790);
+      x.fillText(intervals, 800, 790);
+      x.fillStyle = 'rgba(255,255,255,.4)';
+      x.font = '500 24px "IBM Plex Mono",monospace';
+      x.fillText('MIN', 220, 826);
+      x.fillText('KCAL', 540, 826);
+      x.fillText('SETS', 800, 826);
+      // name + tagline
+      x.textAlign = 'center';
+      x.fillStyle = 'rgba(255,255,255,.75)';
+      x.font = '400 34px "Inter",sans-serif';
+      x.fillText((profile.name || 'A runner') + ' · one mile closer.', 540, 940);
+      x.fillStyle = 'rgba(255,107,53,.8)';
+      x.font = '600 26px "IBM Plex Mono",monospace';
+      x.fillText('#CoachMile', 540, 1010);
       cv.toBlob(async blob => {
         if (!blob) {
           setShare(false);
@@ -4657,24 +4735,18 @@ function CompletionScreen({
   return /*#__PURE__*/React.createElement("div", {
     className: "done-full"
   }, /*#__PURE__*/React.createElement("div", {
+    className: "done-glow"
+  }), /*#__PURE__*/React.createElement("div", {
     className: "done-ring fu1"
   }, "✓"), /*#__PURE__*/React.createElement("div", {
     className: "done-title fu2"
-  }, "Workout done."), /*#__PURE__*/React.createElement("div", {
-    className: "muted fu2",
-    style: {
-      fontSize: 14,
-      maxWidth: 290
-    }
-  }, celebrationFor(sessions || 1, profile.name)), /*#__PURE__*/React.createElement("div", {
+  }, "You did it."), /*#__PURE__*/React.createElement("div", {
+    className: "done-hero fu2"
+  }, uDistN(miles, profile)), /*#__PURE__*/React.createElement("div", {
+    className: "done-hero-lab"
+  }, isMetric(profile) ? "Kilometers" : "Miles"), /*#__PURE__*/React.createElement("div", {
     className: "done-stats fu3"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "done-stat"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "n"
-  }, uDistN(miles, profile)), /*#__PURE__*/React.createElement("div", {
-    className: "l"
-  }, isMetric(profile) ? "Km" : "Miles")), /*#__PURE__*/React.createElement("div", {
     className: "done-stat"
   }, /*#__PURE__*/React.createElement("div", {
     className: "n"
@@ -4686,7 +4758,15 @@ function CompletionScreen({
     className: "n"
   }, cals), /*#__PURE__*/React.createElement("div", {
     className: "l"
-  }, "Calories"))), /*#__PURE__*/React.createElement("div", {
+  }, "Calories")), /*#__PURE__*/React.createElement("div", {
+    className: "done-stat"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "n"
+  }, intervals), /*#__PURE__*/React.createElement("div", {
+    className: "l"
+  }, "Intervals"))), /*#__PURE__*/React.createElement("div", {
+    className: "done-msg fu3"
+  }, celebrationFor(sessions || 1, profile.name)), /*#__PURE__*/React.createElement("div", {
     style: {
       width: "100%",
       maxWidth: 320
@@ -4698,7 +4778,7 @@ function CompletionScreen({
   }, "Share this workout"), /*#__PURE__*/React.createElement("button", {
     className: "btn-ghost",
     onClick: onDone
-  }, "Back to home")), share && /*#__PURE__*/React.createElement("div", {
+  }, "Done")), share && /*#__PURE__*/React.createElement("div", {
     className: "sheet-scrim",
     onClick: () => setShare(false)
   }, /*#__PURE__*/React.createElement("div", {
@@ -4712,18 +4792,20 @@ function CompletionScreen({
     className: "share-card"
   }, /*#__PURE__*/React.createElement("div", {
     className: "sc-t"
-  }, "CoachMile · Session Complete 🏃"), /*#__PURE__*/React.createElement("div", {
-    className: "sc-row"
-  }, /*#__PURE__*/React.createElement("span", null, "Distance"), /*#__PURE__*/React.createElement("span", null, (miles || 0).toFixed(2), " mi")), /*#__PURE__*/React.createElement("div", {
-    className: "sc-row"
-  }, /*#__PURE__*/React.createElement("span", null, "Duration"), /*#__PURE__*/React.createElement("span", null, minutes, " min")), /*#__PURE__*/React.createElement("div", {
-    className: "sc-row"
-  }, /*#__PURE__*/React.createElement("span", null, "Calories"), /*#__PURE__*/React.createElement("span", null, cals, " kcal")), /*#__PURE__*/React.createElement("div", {
+  }, "Session Complete"), /*#__PURE__*/React.createElement("div", {
+    style: {fontSize:52,fontWeight:800,lineHeight:1,letterSpacing:"-.03em",margin:"10px 0 2px",fontFamily:"'Space Grotesk',sans-serif"}
+  }, uDistN(miles, profile)), /*#__PURE__*/React.createElement("div", {
+    style: {fontSize:11,opacity:.75,letterSpacing:".12em",textTransform:"uppercase",fontFamily:"'IBM Plex Mono',monospace",marginBottom:14}
+  }, isMetric(profile) ? "Kilometers" : "Miles"), /*#__PURE__*/React.createElement("div", {
+    style: {display:"flex",gap:20,borderTop:"1px solid rgba(255,255,255,.2)",paddingTop:12}
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {style:{fontWeight:700,fontSize:20}}, minutes), /*#__PURE__*/React.createElement("div", {style:{fontSize:10,opacity:.7,letterSpacing:".1em",textTransform:"uppercase"}}, "min")),
+  !profile.bodyNeutral && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {style:{fontWeight:700,fontSize:20}}, cals), /*#__PURE__*/React.createElement("div", {style:{fontSize:10,opacity:.7,letterSpacing:".1em",textTransform:"uppercase"}}, "kcal")),
+  /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {style:{fontWeight:700,fontSize:20}}, intervals), /*#__PURE__*/React.createElement("div", {style:{fontSize:10,opacity:.7,letterSpacing:".1em",textTransform:"uppercase"}}, "intervals"))), /*#__PURE__*/React.createElement("div", {
     className: "sc-tag"
-  }, profile.name || "A runner", " is one mile closer. #CoachMile")), /*#__PURE__*/React.createElement("button", {
+  }, (profile.name || "A runner"), " · #CoachMile")), /*#__PURE__*/React.createElement("button", {
     className: "btn-primary",
     onClick: doShare
-  }, "Share Workout"), /*#__PURE__*/React.createElement("button", {
+  }, "Save & Share"), /*#__PURE__*/React.createElement("button", {
     className: "btn-ghost",
     onClick: () => {
       setShare(false);
@@ -8586,7 +8668,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(/*#__PURE__*/React.c
     "Quad Stretch":"Estiramiento de cuádriceps","Hip Flexor":"Flexor de cadera","Calf Stretch":"Estiramiento de pantorrilla","IT Band":"Banda iliotibial","Breath Reset":"Respira hondo","Rest":"Descanso",
     "Skip →":"Saltar →","Finish stretch":"Terminar estiramiento",
     // completion
-    "Workout done.":"Entreno terminado.","Strength done.":"Fuerza terminada.","Rounds":"Rondas","Share this workout":"Comparte este entreno","Back to home":"Volver al inicio","Done":"Listo","Share Workout":"Compartir entreno",
+    "Workout done.":"Entreno terminado.","You did it.":"¡Lo lograste!","Strength done.":"Fuerza terminada.","Rounds":"Rondas","Share this workout":"Comparte este entreno","Back to home":"Volver al inicio","Done":"Listo","Share Workout":"Compartir entreno","Save & Share":"Guardar y compartir","Session Complete":"Sesión completa","Kilometers":"Kilómetros","Miles":"Millas","Intervals":"Intervalos",
     // bodyweight
     "Do all 3 rounds. Rest about 30 seconds between them.":"Haz las 3 rondas. Descansa unos 30 segundos entre ellas.","Do all 4 rounds. Rest about 30 seconds between them.":"Haz las 4 rondas. Descansa unos 30 segundos entre ellas.",
     "Move with control. Quality beats speed here.":"Muévete con control. Aquí la técnica vale más que la velocidad.","Rest":"Descanso","Shake it out. Round 2 of 3 is next.":"Sacúdete. Sigue la ronda 2 de 3.",
